@@ -1,0 +1,6 @@
+{
+  "name": "Chopstick Fly Catcher",
+  "description": "A high-speed arcade game where you control chopsticks to chase and catch flies around the screen.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
