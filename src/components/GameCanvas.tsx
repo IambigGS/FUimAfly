@@ -43,6 +43,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       return f;
     });
   };
+
+  // Cinematic Camera Zoom and Spawn Tracking
+  const currentZoom = useRef(1.0);
+  const currentCenterX = useRef(window.innerWidth / 2);
+  const currentCenterY = useRef(window.innerHeight / 2);
+  const hasZoomedThisSession = useRef(false);
+  const isZoomActiveRef = useRef(false);
+  const hasSpawnedNinjaThisSession = useRef(false);
   
   // Game Stats Tracking
   const statsRef = useRef<GameStats>({
@@ -213,7 +221,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const timeoutId = setTimeout(() => {
         setFlyCatchable(newFly.id, true);
         timeScaleRef.current = 1.0;
-      }, 12000);
+      }, 21000);
 
       audio.playFlybyNarration(() => {
         clearTimeout(timeoutId);
@@ -348,13 +356,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       releaseWindowRef.current.y = 80;
     };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'n' || e.key === 'N') {
-        fliesRef.current.push(createFly('ninja'));
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-
     window.addEventListener('resize', handleResize);
     handleResize();
 
@@ -373,6 +374,51 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Clear main arena
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const flies = fliesRef.current;
+      const cTip = chopstickTipRef.current;
+      
+      // Proximity zoom trigger for uncatchable Ninja fly
+      const ninjaFly = flies.find(f => f.type === 'ninja' && f.isCatchable === false);
+      if (ninjaFly && !ninjaFly.isCaught) {
+        const dist = getDistance(cTip.x, cTip.y, ninjaFly.x, ninjaFly.y);
+        if (dist < 160) {
+          if (!hasZoomedThisSession.current) {
+            isZoomActiveRef.current = true;
+          }
+        } else if (dist > 220) {
+          if (isZoomActiveRef.current) {
+            isZoomActiveRef.current = false;
+            hasZoomedThisSession.current = true;
+          }
+        }
+      } else {
+        if (isZoomActiveRef.current) {
+          isZoomActiveRef.current = false;
+          hasZoomedThisSession.current = true;
+        }
+      }
+
+      // Smooth camera interpolation
+      const targetZoom = isZoomActiveRef.current ? 1.25 : 1.0;
+      let targetCenterX = canvas.width / 2;
+      let targetCenterY = canvas.height / 2;
+      if (isZoomActiveRef.current && ninjaFly) {
+        targetCenterX = (cTip.x + ninjaFly.x) / 2;
+        targetCenterY = (cTip.y + ninjaFly.y) / 2;
+      }
+
+      currentZoom.current += (targetZoom - currentZoom.current) * 0.08;
+      currentCenterX.current += (targetCenterX - currentCenterX.current) * 0.08;
+      currentCenterY.current += (targetCenterY - currentCenterY.current) * 0.08;
+
+      ctx.save();
+
+      if (currentZoom.current > 1.005) {
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(currentZoom.current, currentZoom.current);
+        ctx.translate(-currentCenterX.current, -currentCenterY.current);
+      }
 
       // 1.1. Draw Garden Release Window
       const rw = releaseWindowRef.current;
@@ -570,7 +616,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             releaseFlyToFreedom(fly);
           }
         } else if (isNarratingNinja) {
-          // Scripted flight path during narration (12 seconds)
+          // Scripted flight path during narration (21 seconds)
           const elapsed = Date.now() - (fly.narrativeStartTime || 0);
           
           const width = canvas.width;
@@ -578,45 +624,73 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           const centerX = width / 2;
           const centerY = height / 2;
 
-          if (elapsed < 4000) {
-            // Phase 1: Figure of Eight (0 - 4s)
+          if (elapsed < 2000) {
+            // Phase 1 (0-2s): Entering room
+            // Fly from bottom-left corner to center
+            const t = elapsed / 2000;
+            const targetX = centerX - width * 0.4 * (1 - t);
+            const targetY = centerY + height * 0.4 * (1 - t);
+            fly.vx = (targetX - fly.x) * 0.15;
+            fly.vy = (targetY - fly.y) * 0.15;
+          } else if (elapsed < 4000) {
+            // Phase 2 (2-4s): Hovering / coming in
+            // Small wiggle near the center
+            const wiggleT = (elapsed - 2000) * 0.005;
+            const targetX = centerX + Math.sin(wiggleT * 5) * 15;
+            const targetY = centerY + Math.cos(wiggleT * 3) * 10;
+            fly.vx = (targetX - fly.x) * 0.1;
+            fly.vy = (targetY - fly.y) * 0.1;
+          } else if (elapsed < 7000) {
+            // Phase 3 (4-7s): Flying all over the place
+            // Erratic zig-zagging movements
+            const zigT = elapsed - 4000;
+            const ampX = width * 0.35;
+            const ampY = height * 0.3;
+            const targetX = centerX + Math.sin(zigT * 0.008) * Math.cos(zigT * 0.003) * ampX;
+            const targetY = centerY + Math.cos(zigT * 0.007) * Math.sin(zigT * 0.004) * ampY;
+            fly.vx = (targetX - fly.x) * 0.2;
+            fly.vy = (targetY - fly.y) * 0.2;
+          } else if (elapsed < 13000) {
+            // Phase 4 (7-13s): Figure of Eight
             const scaleX = width * 0.25;
             const scaleY = height * 0.2;
-            const angleVal = (elapsed / 4000) * Math.PI * 2;
-            
+            const angleVal = ((elapsed - 7000) / 6000) * Math.PI * 2;
             const targetX = centerX + scaleX * Math.sin(angleVal);
             const targetY = centerY + scaleY * Math.sin(2 * angleVal) / 2;
-            
-            fly.vx = (targetX - fly.x) * 0.1;
-            fly.vy = (targetY - fly.y) * 0.1;
-          } else if (elapsed < 8000) {
-            // Phase 2: Straight Line (4 - 8s)
-            const lineT = (elapsed - 4000) / 4000;
-            const startX = centerX;
-            const startY = centerY;
-            const endX = width * 0.8;
-            const endY = height * 0.3;
-            
-            const targetX = startX + (endX - startX) * lineT;
-            const targetY = startY + (endY - startY) * lineT;
+            fly.vx = (targetX - fly.x) * 0.12;
+            fly.vy = (targetY - fly.y) * 0.12;
+          } else if (elapsed < 16000) {
+            // Phase 5 (13-16s): Going quite straight
+            const lineT = (elapsed - 13000) / 3000;
+            const targetX = centerX + (width * 0.3) * lineT;
+            const targetY = centerY - (height * 0.35) * lineT;
+            fly.vx = (targetX - fly.x) * 0.15;
+            fly.vy = (targetY - fly.y) * 0.15;
+          } else if (elapsed < 19000) {
+            // Phase 6 (16-19s): Doing right angles
+            const rightAngleT = elapsed - 16000;
+            const startX = centerX + width * 0.3;
+            const startY = centerY - height * 0.35;
+            let targetX = startX;
+            let targetY = startY;
 
-            fly.vx = (targetX - fly.x) * 0.1;
-            fly.vy = (targetY - fly.y) * 0.1;
-          } else {
-            // Phase 3: Right Angle (8 - 12s)
-            const phaseT = elapsed - 8000;
-            let targetX = width * 0.8;
-            let targetY = height * 0.3;
-            
-            if (phaseT < 2000) {
-              const subT = phaseT / 2000;
-              targetY = height * 0.3 + (height * 0.4) * subT;
+            if (rightAngleT < 1500) {
+              const t = rightAngleT / 1500;
+              targetY = startY + (height * 0.5) * t;
             } else {
-              const subT = (phaseT - 2000) / 2000;
-              targetY = height * 0.7;
-              targetX = width * 0.8 - (width * 0.6) * subT;
+              const t = (rightAngleT - 1500) / 1500;
+              targetY = startY + height * 0.5;
+              targetX = startX - (width * 0.65) * t;
             }
-
+            fly.vx = (targetX - fly.x) * 0.2;
+            fly.vy = (targetY - fly.y) * 0.2;
+          } else {
+            // Phase 7 (19-21s): Victory lap / Look at me
+            const circleT = elapsed - 19000;
+            const radius = Math.min(width, height) * 0.15;
+            const speedScale = 0.007;
+            const targetX = centerX + Math.cos(circleT * speedScale) * radius;
+            const targetY = centerY + Math.sin(circleT * speedScale) * radius;
             fly.vx = (targetX - fly.x) * 0.15;
             fly.vy = (targetY - fly.y) * 0.15;
           }
@@ -1019,6 +1093,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
+      ctx.restore(); // Balance the camera save
       animFrameId = requestAnimationFrame(renderLoop);
     };
 
@@ -1028,7 +1103,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('keydown', handleKeyDown);
       cancelAnimationFrame(animFrameId);
       audio.stopFlybyNarration();
       audio.clearAllBuzzers();
@@ -1225,9 +1299,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       combo: 0,
       maxCombo: 0,
       gameTimeRemaining: gameMode === 'arcade' ? 60 : 0,
-      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0 },
+      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
     };
     plateRef.current.hp = 100;
+    hasSpawnedNinjaThisSession.current = false;
+    hasZoomedThisSession.current = false;
+    isZoomActiveRef.current = false;
+    currentZoom.current = 1.0;
     onStatsUpdate({ ...statsRef.current });
 
     // Spawn ticker to keep fly count consistent or increase in difficulty
@@ -1244,6 +1322,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     secondTimerRef.current = window.setInterval(() => {
       const stats = statsRef.current;
       
+      // Natural Spawning condition for Ninja Fly
+      if (!hasSpawnedNinjaThisSession.current) {
+        let shouldSpawn = false;
+        if (gameMode === 'arcade' && stats.gameTimeRemaining === 40) {
+          shouldSpawn = true;
+        } else if (gameMode !== 'arcade' && stats.fliesCaught >= 5) {
+          shouldSpawn = true;
+        }
+
+        if (shouldSpawn) {
+          hasSpawnedNinjaThisSession.current = true;
+          fliesRef.current.push(createFly('ninja'));
+        }
+      }
+
       if (gameMode === 'arcade') {
         stats.gameTimeRemaining--;
 
