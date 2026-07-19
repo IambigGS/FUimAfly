@@ -23,6 +23,7 @@ class AudioEngine {
   private fluteTimer: number | null = null;
   private isFlutePlaying = false;
   private activeFluteOscs: { osc: OscillatorNode; gain: GainNode }[] = [];
+  private activeFlybyAudio: HTMLAudioElement | null = null;
 
   // Master volume variables (0 to 1)
   private masterVolume = 0.5;
@@ -577,6 +578,55 @@ class AudioEngine {
       });
       this.activeFluteOscs = [];
     }, 600);
+  }
+
+  // Play flyby narration sound
+  playFlybyNarration(onEnded: () => void) {
+    this.resume();
+    this.stopFlybyNarration(); // stop any existing first
+    
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) {
+      onEnded();
+      return;
+    }
+    
+    try {
+      const audio = new Audio('/sounds/flies/flyBy_sound_1.mp3');
+      this.activeFlybyAudio = audio;
+      
+      const sourceNode = this.ctx.createMediaElementSource(audio);
+      sourceNode.connect(this.sfxGain);
+      
+      audio.play().catch(e => {
+        console.warn("Failed to play flyBy_sound_1.mp3:", e);
+        onEnded();
+      });
+
+      audio.addEventListener('ended', () => {
+        this.activeFlybyAudio = null;
+        onEnded();
+      });
+    } catch (e) {
+      console.warn("MediaElementSource failed (could be already created):", e);
+      // Fallback: play it directly without Web Audio graph if graph creation fails
+      const audio = new Audio('/sounds/flies/flyBy_sound_1.mp3');
+      this.activeFlybyAudio = audio;
+      audio.play().catch(onEnded);
+      audio.addEventListener('ended', () => {
+        this.activeFlybyAudio = null;
+        onEnded();
+      });
+    }
+  }
+
+  stopFlybyNarration() {
+    if (this.activeFlybyAudio) {
+      try {
+        this.activeFlybyAudio.pause();
+        this.activeFlybyAudio.currentTime = 0;
+      } catch (e) {}
+      this.activeFlybyAudio = null;
+    }
   }
 }
 

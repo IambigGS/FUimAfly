@@ -1,6 +1,6 @@
 export type GameMode = 'arcade' | 'zen' | 'training';
 
-export type FlyType = 'housefly' | 'bluebottle' | 'fruitfly' | 'golden';
+export type FlyType = 'housefly' | 'bluebottle' | 'fruitfly' | 'golden' | 'ninja';
 
 export interface Fly {
   id: string;
@@ -25,6 +25,8 @@ export interface Fly {
   targetY?: number;
   restTimer?: number;
   state: 'flying' | 'hovering' | 'resting' | 'escaping' | 'releasing';
+  isCatchable?: boolean;
+  narrativeStartTime?: number;
 }
 
 export interface Particle {

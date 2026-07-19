@@ -33,6 +33,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const fliesRef = useRef<Fly[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const floatingTextsRef = useRef<{ id: string; x: number; y: number; text: string; color: string; life: number; maxLife: number }[]>([]);
+  const timeScaleRef = useRef(1.0);
+
+  const setFlyCatchable = (flyId: string, catchable: boolean) => {
+    fliesRef.current = fliesRef.current.map((f) => {
+      if (f.id === flyId) {
+        return { ...f, isCatchable: catchable };
+      }
+      return f;
+    });
+  };
   
   // Game Stats Tracking
   const statsRef = useRef<GameStats>({
@@ -43,7 +53,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     combo: 0,
     maxCombo: 0,
     gameTimeRemaining: 60,
-    fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0 },
+    fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
   });
 
   // Plate state for Feast Guard
@@ -94,10 +104,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const createFly = (type?: FlyType, customX?: number, customY?: number): Fly => {
     const types: FlyType[] = ['housefly', 'bluebottle', 'fruitfly'];
     
-    // Low chance to spawn rare Golden fly based on time or randomness
+    // Spawn rare flies based on randomness
     let flyType: FlyType = type || types[Math.floor(Math.random() * types.length)];
-    if (!type && Math.random() < 0.08) {
-      flyType = 'golden';
+    if (!type) {
+      const rand = Math.random();
+      if (rand < 0.05) {
+        flyType = 'ninja';
+      } else if (rand < 0.12) {
+        flyType = 'golden';
+      }
     }
 
     const canvas = canvasRef.current;
@@ -155,9 +170,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         color = '#eab308';
         wingColor = 'rgba(254, 252, 232, 0.8)';
         break;
+      case 'ninja':
+        size = 15;
+        speed = 3.0;
+        twitchiness = 0.05;
+        points = 1500;
+        buzzPitch = 110;
+        color = '#a855f7';
+        wingColor = 'rgba(232, 218, 250, 0.7)';
+        break;
     }
 
-    return {
+    const newFly: Fly = {
       id: Math.random().toString(),
       type: flyType,
       x,
@@ -176,7 +200,29 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       wingColor,
       isCaught: false,
       state: 'flying',
+      isCatchable: true,
     };
+
+    if (flyType === 'ninja') {
+      newFly.isCatchable = false;
+      newFly.narrativeStartTime = Date.now();
+
+      // Trigger bullet time slow motion
+      timeScaleRef.current = 0.35;
+
+      const timeoutId = setTimeout(() => {
+        setFlyCatchable(newFly.id, true);
+        timeScaleRef.current = 1.0;
+      }, 12000);
+
+      audio.playFlybyNarration(() => {
+        clearTimeout(timeoutId);
+        setFlyCatchable(newFly.id, true);
+        timeScaleRef.current = 1.0;
+      });
+    }
+
+    return newFly;
   };
 
   // Trigger high-value particles
@@ -301,6 +347,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       releaseWindowRef.current.x = canvas.width / 2;
       releaseWindowRef.current.y = 80;
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'n' || e.key === 'N') {
+        fliesRef.current.push(createFly('ninja'));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
 
     window.addEventListener('resize', handleResize);
     handleResize();
@@ -477,8 +530,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const mouse = mouseRef.current;
       const cTip = chopstickTipRef.current;
 
-      cTip.x += (mouse.x - cTip.x) * 0.45;
-      cTip.y += (mouse.y - cTip.y) * 0.45;
+      cTip.x += (mouse.x - cTip.x) * 0.45 * timeScaleRef.current;
+      cTip.y += (mouse.y - cTip.y) * 0.45 * timeScaleRef.current;
 
       // Animate clamp separation gap
       const targetSep = mouse.isPinching ? 1.5 : 24;
@@ -490,14 +543,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       fliesRef.current = flies.map((fly) => {
         const rw = releaseWindowRef.current;
 
+        const isNarratingNinja = fly.type === 'ninja' && fly.isCatchable === false && fly.narrativeStartTime;
+
         if (fly.state === 'releasing') {
           // Animate fly flying away into the window
-          fly.x += (rw.x - fly.x) * 0.15;
-          fly.y += (rw.y - fly.y) * 0.15;
+          fly.x += (rw.x - fly.x) * 0.15 * timeScaleRef.current;
+          fly.y += (rw.y - fly.y) * 0.15 * timeScaleRef.current;
           fly.vx = 0;
           fly.vy = 0;
           fly.size *= 0.88; // shrink as it recedes
-          fly.wingAngle += 1.2; // buzz wings frantically to fly away!
+          fly.wingAngle += 1.2 * timeScaleRef.current; // buzz wings frantically to fly away!
           
           if (Math.random() < 0.25) {
             createSparkles(fly.x, fly.y, 'rgba(254, 240, 138, 0.8)', 1);
@@ -513,6 +568,68 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           const distToWindow = getDistance(fly.x, fly.y, rw.x, rw.y);
           if (distToWindow <= rw.radius + 15) {
             releaseFlyToFreedom(fly);
+          }
+        } else if (isNarratingNinja) {
+          // Scripted flight path during narration (12 seconds)
+          const elapsed = Date.now() - (fly.narrativeStartTime || 0);
+          
+          const width = canvas.width;
+          const height = canvas.height;
+          const centerX = width / 2;
+          const centerY = height / 2;
+
+          if (elapsed < 4000) {
+            // Phase 1: Figure of Eight (0 - 4s)
+            const scaleX = width * 0.25;
+            const scaleY = height * 0.2;
+            const angleVal = (elapsed / 4000) * Math.PI * 2;
+            
+            const targetX = centerX + scaleX * Math.sin(angleVal);
+            const targetY = centerY + scaleY * Math.sin(2 * angleVal) / 2;
+            
+            fly.vx = (targetX - fly.x) * 0.1;
+            fly.vy = (targetY - fly.y) * 0.1;
+          } else if (elapsed < 8000) {
+            // Phase 2: Straight Line (4 - 8s)
+            const lineT = (elapsed - 4000) / 4000;
+            const startX = centerX;
+            const startY = centerY;
+            const endX = width * 0.8;
+            const endY = height * 0.3;
+            
+            const targetX = startX + (endX - startX) * lineT;
+            const targetY = startY + (endY - startY) * lineT;
+
+            fly.vx = (targetX - fly.x) * 0.1;
+            fly.vy = (targetY - fly.y) * 0.1;
+          } else {
+            // Phase 3: Right Angle (8 - 12s)
+            const phaseT = elapsed - 8000;
+            let targetX = width * 0.8;
+            let targetY = height * 0.3;
+            
+            if (phaseT < 2000) {
+              const subT = phaseT / 2000;
+              targetY = height * 0.3 + (height * 0.4) * subT;
+            } else {
+              const subT = (phaseT - 2000) / 2000;
+              targetY = height * 0.7;
+              targetX = width * 0.8 - (width * 0.6) * subT;
+            }
+
+            fly.vx = (targetX - fly.x) * 0.15;
+            fly.vy = (targetY - fly.y) * 0.15;
+          }
+
+          fly.x += fly.vx * timeScaleRef.current;
+          fly.y += fly.vy * timeScaleRef.current;
+
+          if (Math.abs(fly.vx) > 0.1 || Math.abs(fly.vy) > 0.1) {
+            fly.angle = Math.atan2(fly.vy, fly.vx) + Math.PI / 2;
+          }
+
+          if (Math.random() < 0.3) {
+            createSparkles(fly.x, fly.y, 'rgba(168, 85, 247, 0.6)', 1);
           }
         } else {
           // Proximity calculation for escape reaction
@@ -600,8 +717,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
 
         // Apply position update
-        fly.x += fly.vx;
-        fly.y += fly.vy;
+        fly.x += fly.vx * timeScaleRef.current;
+        fly.y += fly.vy * timeScaleRef.current;
 
         // Wall collisions / bounce mechanics
         const pad = 20;
@@ -626,8 +743,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.translate(fly.x, fly.y);
         ctx.rotate(fly.angle);
 
+        // Draw custom aura if it is a narrating ninja fly
+        if (fly.type === 'ninja' && fly.isCatchable === false) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.55)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.rotate(Date.now() * 0.0035);
+          ctx.beginPath();
+          ctx.arc(0, 0, fly.size * 1.8, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
         // Fly wings flap oscillation
-        fly.wingAngle += fly.wingSpeed;
+        fly.wingAngle += fly.wingSpeed * timeScaleRef.current;
         const wingOffset = Math.sin(fly.wingAngle) * 0.6;
 
         // Draw wings
@@ -753,9 +883,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 5. Update & Draw Splash/Dust Particles
       ctx.save();
       particlesRef.current = particlesRef.current.filter((p) => {
-        p.life++;
-        p.x += p.vx;
-        p.y += p.vy;
+        p.life += timeScaleRef.current;
+        p.x += p.vx * timeScaleRef.current;
+        p.y += p.vy * timeScaleRef.current;
         p.alpha = 1.0 - (p.life / p.maxLife);
 
         ctx.fillStyle = p.color;
@@ -771,8 +901,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 6. Update & Draw Floating Calligraphy Score indicators
       ctx.save();
       floatingTextsRef.current = floatingTextsRef.current.filter((ft) => {
-        ft.life++;
-        ft.y -= 0.6; // float up gently
+        ft.life += timeScaleRef.current;
+        ft.y -= 0.6 * timeScaleRef.current; // float up gently
         const alpha = 1.0 - (ft.life / ft.maxLife);
 
         ctx.fillStyle = ft.color;
@@ -898,7 +1028,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleKeyDown);
       cancelAnimationFrame(animFrameId);
+      audio.stopFlybyNarration();
+      audio.clearAllBuzzers();
     };
   }, [isPlaying, gameMode, difficulty, chopstickStyleId, showHelper, soundEnabled, frenzyActive]);
 
@@ -925,6 +1058,23 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     // Strike Hitbox verification
     const strikeRadius = diffSettings.hitRadius;
     let caughtFlyIndex = -1;
+
+    // Check if player clicked near an uncatchable fly (so we ignore input completely)
+    let clickedUncatchable = false;
+    for (let i = 0; i < flies.length; i++) {
+      const fly = flies[i];
+      if (fly.isCatchable === false) {
+        const dist = getDistance(hitX, hitY, fly.x, fly.y);
+        if (dist <= strikeRadius * 1.5) {
+          clickedUncatchable = true;
+          break;
+        }
+      }
+    }
+
+    if (clickedUncatchable) {
+      return; // Ignore the input completely!
+    }
 
     // Find first fly within hit bounds
     for (let i = 0; i < flies.length; i++) {

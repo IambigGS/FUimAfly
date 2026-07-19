@@ -56,7 +56,7 @@ export default function App() {
     combo: 0,
     maxCombo: 0,
     gameTimeRemaining: 60,
-    fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0 },
+    fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
   });
 
   // Historical High Scores (Loaded from localStorage)
@@ -116,7 +116,7 @@ export default function App() {
       combo: 0,
       maxCombo: 0,
       gameTimeRemaining: mode === 'arcade' ? 60 : 0,
-      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0 },
+      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
     });
   };
 
@@ -582,6 +582,10 @@ export default function App() {
                       <span>✨ Golden Empress:</span>
                       <span className="font-mono font-bold">{stats.fliesTypeCount.golden}</span>
                     </div>
+                    <div className="flex justify-between items-center text-purple-600 font-bold">
+                      <span>🥋 Ninja Sensei:</span>
+                      <span className="font-mono font-bold">{stats.fliesTypeCount.ninja}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -692,6 +696,7 @@ export default function App() {
                       <span>Bluebottle: {stats.fliesTypeCount.bluebottle}</span>
                       <span>Fruitfly: {stats.fliesTypeCount.fruitfly}</span>
                       <span className="text-brand-red font-black">Golden: {stats.fliesTypeCount.golden}</span>
+                      <span className="text-purple-600 font-black">Ninja: {stats.fliesTypeCount.ninja}</span>
                     </div>
                   </div>
                 </div>
