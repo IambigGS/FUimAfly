@@ -574,7 +574,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // 2. Interpolate Chopsticks position (smooth trailing physics)
       const mouse = mouseRef.current;
-      const cTip = chopstickTipRef.current;
 
       cTip.x += (mouse.x - cTip.x) * 0.45 * timeScaleRef.current;
       cTip.y += (mouse.y - cTip.y) * 0.45 * timeScaleRef.current;
@@ -584,7 +583,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       cTip.separation += (targetSep - cTip.separation) * 0.55;
 
       // 3. Update & Draw Fly entities
-      const flies = fliesRef.current;
 
       fliesRef.current = flies.map((fly) => {
         const rw = releaseWindowRef.current;
