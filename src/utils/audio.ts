@@ -378,7 +378,8 @@ class AudioEngine {
         source.buffer = this.flyBuffers[soundIndex];
         source.loop = true;
         source.connect(gain);
-        source.start(now);
+        const randomOffset = Math.random() * source.buffer.duration;
+        source.start(now, randomOffset);
       } else {
         // Fallback to procedural synthesis if no files loaded
         osc1 = ctx.createOscillator();
@@ -457,6 +458,14 @@ class AudioEngine {
 
   clearAllBuzzers() {
     Array.from(this.flyBuzzers.keys()).forEach(id => this.stopFlyBuzz(id));
+  }
+
+  cleanupDeadBuzzers(activeFlyIds: Set<string>) {
+    Array.from(this.flyBuzzers.keys()).forEach((id) => {
+      if (!activeFlyIds.has(id)) {
+        this.stopFlyBuzz(id);
+      }
+    });
   }
 
   // Tranquil Zen Dojo Flute Synthesizer (Shakuhachi-inspired)

@@ -486,8 +486,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // 3. Update & Draw Fly entities
       const flies = fliesRef.current;
-      let closestFly: Fly | null = null;
-      let minDistance = 999999;
 
       fliesRef.current = flies.map((fly) => {
         const rw = releaseWindowRef.current;
@@ -517,12 +515,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             releaseFlyToFreedom(fly);
           }
         } else {
-          // Proximity calculation for sound & escape reaction
-        const distToChopstick = getDistance(fly.x, fly.y, cTip.x, cTip.y);
-        if (distToChopstick < minDistance) {
-          minDistance = distToChopstick;
-          closestFly = fly;
-        }
+          // Proximity calculation for escape reaction
+          const distToChopstick = getDistance(fly.x, fly.y, cTip.x, cTip.y);
 
         // State Machine Fly Behavior
         const speedMultiplier = diffSettings.flySpeedMult * (frenzyActive ? 1.35 : 1.0);
@@ -715,38 +709,42 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         fliesRef.current.push(createFly());
       }
 
-      // 4. Update spatial buzzing sound for nearest fly
-      if (soundEnabled && closestFly) {
-        const fly = closestFly as Fly;
-        const dist = minDistance;
-        
-        // Volume scale is intense when right under chopsticks, fades to zero by 300px
-        const maxHearingRadius = 320;
-        let volumeScale = 0;
-        if (dist < maxHearingRadius) {
-          volumeScale = 1.0 - (dist / maxHearingRadius);
-          // Modulate volume if escaping or flying
-          if (fly.state === 'escaping') {
-            volumeScale *= 1.35;
-          }
-        }
+      // 4. Update spatial buzzing sound for all flies
+      if (soundEnabled && flies.length > 0) {
+        const activeFlyIds = new Set<string>();
 
-        const screenPanX = (fly.x - canvas.width / 2) / (canvas.width / 2);
-        
-        // Real-time procedural buzz
-        audio.updateFlyBuzz(fly.id, {
-          pitch: fly.state === 'escaping' ? fly.buzzPitch * 1.2 : fly.buzzPitch,
-          volumeMultiplier: volumeScale,
-          panX: screenPanX,
-          isActive: true,
+        flies.forEach((fly) => {
+          if (fly.state === 'releasing' || fly.isCaught) {
+            audio.stopFlyBuzz(fly.id);
+            return;
+          }
+
+          const dist = getDistance(fly.x, fly.y, cTip.x, cTip.y);
+          activeFlyIds.add(fly.id);
+
+          // Volume scale is intense when right under chopsticks, fades to zero by 320px
+          const maxHearingRadius = 320;
+          let volumeScale = 0;
+          if (dist < maxHearingRadius) {
+            volumeScale = 1.0 - (dist / maxHearingRadius);
+            // Modulate volume if escaping or flying
+            if (fly.state === 'escaping') {
+              volumeScale *= 1.35;
+            }
+          }
+
+          const screenPanX = (fly.x - canvas.width / 2) / (canvas.width / 2);
+
+          audio.updateFlyBuzz(fly.id, {
+            pitch: fly.state === 'escaping' ? fly.buzzPitch * 1.2 : fly.buzzPitch,
+            volumeMultiplier: volumeScale,
+            panX: screenPanX,
+            isActive: true,
+          });
         });
 
-        // Silence other fly buzzers
-        flies.forEach((f) => {
-          if (f.id !== fly.id) {
-            audio.stopFlyBuzz(f.id);
-          }
-        });
+        // Clean up any buzzers for flies that no longer exist
+        audio.cleanupDeadBuzzers(activeFlyIds);
       } else {
         // No flies, silence all
         audio.clearAllBuzzers();
