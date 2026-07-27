@@ -452,16 +452,48 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     let animFrameId: number;
 
     const handleResize = () => {
-      canvas.width = canvas.parentElement?.clientWidth || window.innerWidth;
-      canvas.height = canvas.parentElement?.clientHeight || window.innerHeight;
-      
-      // Update plate center in Training mode
-      plateRef.current.x = canvas.width / 2;
-      plateRef.current.y = canvas.height * 0.72;
+      const w = canvas.parentElement?.clientWidth || window.innerWidth;
+      const h = canvas.parentElement?.clientHeight || window.innerHeight;
+      canvas.width = w;
+      canvas.height = h;
 
-      // Update release window center
-      releaseWindowRef.current.x = canvas.width / 2;
-      releaseWindowRef.current.y = 80;
+      // Update Matcha Tea Cup position (Left side of canvas)
+      teaRef.current.x = Math.max(90, w * 0.18);
+      teaRef.current.y = h * 0.68;
+      teaRef.current.origX = Math.max(90, w * 0.18);
+      teaRef.current.origY = h * 0.68;
+
+      // Update Dumpling Plate position (Center of canvas)
+      plateRef.current.x = w * 0.50;
+      plateRef.current.y = h * 0.70;
+
+      // Update Target Mouth position (Right side of canvas)
+      mouthRef.current.x = Math.min(w - 90, w * 0.82);
+      mouthRef.current.y = h * 0.65;
+
+      // Update Release Window position (Top center of canvas)
+      releaseWindowRef.current.x = w * 0.50;
+      releaseWindowRef.current.y = Math.max(65, h * 0.14);
+
+      // Re-position active dumplings relative to the plate center
+      if (dumplingsRef.current.length > 0) {
+        const totalCount = dumplingsRef.current.length;
+        const plateX = plateRef.current.x;
+        const plateY = plateRef.current.y;
+        const radius = Math.min(36, w * 0.08);
+
+        dumplingsRef.current.forEach((d, i) => {
+          const angle = (i / totalCount) * Math.PI * 2;
+          const dx = Math.cos(angle) * (totalCount > 6 ? radius : radius * 0.7);
+          const dy = Math.sin(angle) * (totalCount > 6 ? radius * 0.5 : radius * 0.35);
+          d.origX = plateX + dx;
+          d.origY = plateY + dy - 5;
+          if (!d.isEaten) {
+            d.x = d.origX;
+            d.y = d.origY;
+          }
+        });
+      }
     };
 
     window.addEventListener('resize', handleResize);
@@ -795,6 +827,55 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.fillText('MASTER 👄', mouth.x, mouth.y + mouth.radius + 18);
 
       ctx.restore();
+
+      // Render Item Currently Being Dragged by Mouse
+      if (dragItemRef.current) {
+        const drag = dragItemRef.current;
+        const mx = mouseRef.current.x;
+        const my = mouseRef.current.y;
+
+        ctx.save();
+        if (drag.type === 'dumpling') {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+          ctx.beginPath();
+          ctx.ellipse(mx, my + 10, 16, 7, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#fffdf5';
+          ctx.strokeStyle = '#e6ccb2';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(mx, my, 16, 12, -0.1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.strokeStyle = '#d7b99c';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(mx - 8, my - 2);
+          ctx.quadraticCurveTo(mx, my - 6, mx + 8, my - 2);
+          ctx.stroke();
+        } else if (drag.type === 'tea') {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+          ctx.beginPath();
+          ctx.ellipse(mx, my + 16, 28, 10, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#2d4a27';
+          ctx.strokeStyle = '#ebdcb9';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.ellipse(mx, my, 24, 16, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = '#4ade80';
+          ctx.beginPath();
+          ctx.ellipse(mx, my - 2, 19, 11, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
 
       // 2. Interpolate Chopsticks position (smooth trailing physics)
       const mouse = mouseRef.current;
@@ -1513,15 +1594,149 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }, 10000); // 10 seconds of frenzy
   };
 
-  // Tracking Coordinates
+  // PC Mouse Handlers for Dragging Dumplings/Tea & Pinching Chopsticks
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isPlaying) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    mouseRef.current.x = mx;
+    mouseRef.current.y = my;
+
+    // 1. Check if clicking on an unblocked Dumpling
+    const dumplings = dumplingsRef.current;
+    let clickedDumplingIndex = -1;
+    for (let i = 0; i < dumplings.length; i++) {
+      const d = dumplings[i];
+      if (!d.isEaten && getDistance(mx, my, d.x, d.y) <= 24) {
+        if (!d.isBlockedByFly) {
+          clickedDumplingIndex = i;
+        }
+        break;
+      }
+    }
+
+    if (clickedDumplingIndex !== -1) {
+      const d = dumplings[clickedDumplingIndex];
+      dragItemRef.current = {
+        type: 'dumpling',
+        id: d.id,
+        index: clickedDumplingIndex,
+        startX: mx,
+        startY: my,
+      };
+      return;
+    }
+
+    // 2. Check if clicking on unblocked Matcha Tea Cup
+    const tea = teaRef.current;
+    if (getDistance(mx, my, tea.x, tea.y) <= 34) {
+      if (!tea.isBlockedByFly) {
+        dragItemRef.current = {
+          type: 'tea',
+          startX: mx,
+          startY: my,
+        };
+        return;
+      }
+    }
+
+    // 3. Otherwise perform Chopstick Pinch Strike to catch flies!
+    performPinchStrike(e.clientX, e.clientY);
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isPlaying) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    mouseRef.current.x = e.clientX - rect.left;
-    mouseRef.current.y = e.clientY - rect.top;
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    mouseRef.current.x = mx;
+    mouseRef.current.y = my;
+
+    // Open mouth visual feedback when dragging near mouth
+    if (dragItemRef.current) {
+      const mouth = mouthRef.current;
+      const dist = getDistance(mx, my, mouth.x, mouth.y);
+      mouth.isOpen = dist <= mouth.radius + 25;
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isPlaying) return;
+
+    if (dragItemRef.current) {
+      const drag = dragItemRef.current;
+      const mx = mouseRef.current.x;
+      const my = mouseRef.current.y;
+      const mouth = mouthRef.current;
+      const dist = getDistance(mx, my, mouth.x, mouth.y);
+
+      if (dist <= mouth.radius + 30) {
+        // Dropped into Master's Mouth!
+        if (drag.type === 'dumpling') {
+          if (sipNeededRef.current) {
+            // Master needs tea first!
+            addFloatingText(mouth.x, mouth.y - 20, 'Master is thirsty! Take a sip 🍵', '#b45309');
+            if (soundEnabled) audio.playClack();
+          } else {
+            // Eat dumpling!
+            const d = dumplingsRef.current.find((dum) => dum.id === drag.id);
+            if (d && !d.isEaten) {
+              d.isEaten = true;
+              dumplingsEatenThisLevelRef.current++;
+              dumplingsEatenSinceLastDrinkRef.current++;
+
+              if (soundEnabled) audio.playMunch();
+              addFloatingText(mouth.x, mouth.y - 20, 'Munch! 🥟 +150p', '#10b981');
+              createCaptureParticles(mouth.x, mouth.y, '#ebdcb9', 10);
+
+              statsRef.current.score += 150;
+              onStatsUpdate({ ...statsRef.current });
+
+              // Check Tea Sip Rule (Level 1: 2 dumplings, Level 2+: 3 dumplings)
+              const lvl = currentLevelRef.current;
+              const threshold = lvl === 1 ? 2 : 3;
+              if (dumplingsEatenSinceLastDrinkRef.current >= threshold) {
+                sipNeededRef.current = true;
+              }
+
+              // Check Level Complete
+              const remaining = dumplingsRef.current.filter((dum) => !dum.isEaten).length;
+              if (remaining === 0) {
+                if (soundEnabled) audio.playSfx('levelup');
+                addFloatingText(window.innerWidth / 2, window.innerHeight / 3, `LEVEL ${lvl} COMPLETE! 🏆`, '#eab308');
+                currentLevelRef.current++;
+                setTimeout(() => {
+                  initLevelDumplings(currentLevelRef.current);
+                }, 800);
+              }
+            }
+          }
+        } else if (drag.type === 'tea') {
+          if (sipNeededRef.current) {
+            // Drink Matcha Tea!
+            if (soundEnabled) audio.playGulp();
+            sipNeededRef.current = false;
+            dumplingsEatenSinceLastDrinkRef.current = 0;
+            addFloatingText(mouth.x, mouth.y - 20, 'Ahhh! Refreshing 🍵🍃', '#16a34a');
+            createCaptureParticles(mouth.x, mouth.y, '#4ade80', 12);
+          } else {
+            addFloatingText(mouth.x, mouth.y - 20, 'Not thirsty yet! 🍵', '#654321');
+          }
+        }
+      }
+
+      dragItemRef.current = null;
+      mouth.isOpen = false;
+    } else {
+      handleReleasePinch();
+    }
   };
 
   // Touch handlers for mobile players
@@ -1762,8 +1977,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       id="game-arena-container"
       className="relative w-full h-full select-none overflow-hidden cursor-none z-10"
       onMouseMove={handleMouseMove}
-      onMouseDown={(e) => performPinchStrike(e.clientX, e.clientY)}
-      onMouseUp={handleReleasePinch}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
