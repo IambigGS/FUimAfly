@@ -273,7 +273,7 @@ export default function App() {
                   <div className="space-y-3">
                     {/* Unified Main Game Button */}
                     <button
-                      onClick={() => handleStartGame('arcade')}
+                      onClick={() => handleStartGame('training')}
                       id="play-feast-btn"
                       className="w-full text-left p-5 rounded-none border-3 border-brand-charcoal bg-white hover:bg-brand-linen hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[5px_5px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-start justify-between"
                     >
