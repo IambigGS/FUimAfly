@@ -623,7 +623,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.strokeStyle = '#b45309';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.roundRect(tea.x - 55, tea.y - 65, 110, 24, 6);
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(tea.x - 55, tea.y - 65, 110, 24, 6);
+        } else {
+          ctx.rect(tea.x - 55, tea.y - 65, 110, 24);
+        }
         ctx.fill();
         ctx.stroke();
 

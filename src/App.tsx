@@ -131,8 +131,12 @@ export default function App() {
       accuracy: 100,
       combo: 0,
       maxCombo: 0,
-      gameTimeRemaining: mode === 'arcade' ? 60 : 0,
+      gameTimeRemaining: 0,
       fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
+      level: 1,
+      dumplingsLeft: 5,
+      dumplingsEatenThisLevel: 0,
+      sipNeeded: false,
     });
   };
 
