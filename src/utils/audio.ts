@@ -1,5 +1,11 @@
 // Web Audio API Procedural Synthesizer for Chopstick Fly Catcher
 
+const getAssetUrl = (path: string): string => {
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  const baseUrl = import.meta.env.BASE_URL || './';
+  return baseUrl.endsWith('/') ? `${baseUrl}${cleanPath}` : `${baseUrl}/${cleanPath}`;
+};
+
 class AudioEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
@@ -66,7 +72,8 @@ class AudioEngine {
     
     for (let i = 1; i <= maxSounds; i++) {
       try {
-        const response = await fetch(`/sounds/flies/fly_sound_${i}.mp3`);
+        const soundUrl = getAssetUrl(`sounds/flies/fly_sound_${i}.mp3`);
+        const response = await fetch(soundUrl);
         if (!response.ok) {
           // No more consecutive files found, stop checking
           break;
@@ -81,6 +88,7 @@ class AudioEngine {
       }
     }
     this.flyBuffers = buffers;
+    console.log(`Successfully loaded ${this.flyBuffers.length} fly sounds consecutively.`);
   }
 
   resume() {
@@ -590,8 +598,10 @@ class AudioEngine {
       return;
     }
     
+    const soundUrl = getAssetUrl('sounds/flies/flyBy_sound_1.mp3');
+
     try {
-      const audio = new Audio('/sounds/flies/flyBy_sound_1.mp3');
+      const audio = new Audio(soundUrl);
       this.activeFlybyAudio = audio;
       
       const sourceNode = this.ctx.createMediaElementSource(audio);
@@ -609,7 +619,7 @@ class AudioEngine {
     } catch (e) {
       console.warn("MediaElementSource failed (could be already created):", e);
       // Fallback: play it directly without Web Audio graph if graph creation fails
-      const audio = new Audio('/sounds/flies/flyBy_sound_1.mp3');
+      const audio = new Audio(soundUrl);
       this.activeFlybyAudio = audio;
       audio.play().catch(onEnded);
       audio.addEventListener('ended', () => {

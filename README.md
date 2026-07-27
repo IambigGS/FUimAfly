@@ -18,3 +18,9 @@ View your app in AI Studio: https://ai.studio/apps/904c127e-d3ef-48e0-b8e4-ca019
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Deployment & Repository
+
+- **GitHub Repository**: [https://github.com/IambigGS/FUimAfly.git](https://github.com/IambigGS/FUimAfly.git)
+- **Live GitHub Pages**: [https://IambigGS.github.io/FUimAfly/](https://IambigGS.github.io/FUimAfly/)
+

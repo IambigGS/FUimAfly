@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Fly, FlyType, Particle, GameStats, ChopstickConfig } from '../types';
 import { audio } from '../utils/audio';
 import { CHOPSTICK_STYLES } from './SettingsModal';
+import { Capacitor } from '@capacitor/core';
 
 interface GameCanvasProps {
   isPlaying: boolean;
@@ -31,6 +32,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const mouseRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2, isPinching: false });
   const chopstickTipRef = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2, separation: 24 });
   const fliesRef = useRef<Fly[]>([]);
+  
+  // Mobile virtual controls
+  const joystickRef = useRef({ active: false, id: -1, baseX: 0, baseY: 0, thumbX: 0, thumbY: 0 });
+  const actionButtonRef = useRef({ active: false, id: -1 });
   const particlesRef = useRef<Particle[]>([]);
   const floatingTextsRef = useRef<{ id: string; x: number; y: number; text: string; color: string; life: number; maxLife: number }[]>([]);
   const timeScaleRef = useRef(1.0);
@@ -575,6 +580,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 2. Interpolate Chopsticks position (smooth trailing physics)
       const mouse = mouseRef.current;
 
+      // Mobile Joystick Movement
+      if (Capacitor.isNativePlatform() && joystickRef.current.active) {
+        const dx = joystickRef.current.thumbX - joystickRef.current.baseX;
+        const dy = joystickRef.current.thumbY - joystickRef.current.baseY;
+        mouse.x += dx * 0.22 * timeScaleRef.current;
+        mouse.y += dy * 0.22 * timeScaleRef.current;
+        mouse.x = Math.max(0, Math.min(canvas.width, mouse.x));
+        mouse.y = Math.max(0, Math.min(canvas.height, mouse.y));
+      }
+
       cTip.x += (mouse.x - cTip.x) * 0.45 * timeScaleRef.current;
       cTip.y += (mouse.y - cTip.y) * 0.45 * timeScaleRef.current;
 
@@ -1092,6 +1107,33 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       ctx.restore(); // Balance the camera save
+      
+      // 9. Draw Mobile Virtual Joystick and Action Hint (Outside camera transform so it stays fixed to screen)
+      if (Capacitor.isNativePlatform()) {
+        if (joystickRef.current.active) {
+          ctx.beginPath();
+          ctx.arc(joystickRef.current.baseX, joystickRef.current.baseY, 45, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(joystickRef.current.thumbX, joystickRef.current.thumbY, 20, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          ctx.fill();
+        }
+
+        if (actionButtonRef.current.active) {
+          const gradient = ctx.createLinearGradient(canvas.width - 120, 0, canvas.width, 0);
+          gradient.addColorStop(0, 'rgba(255,255,255,0)');
+          gradient.addColorStop(1, 'rgba(255,255,255,0.12)');
+          ctx.fillStyle = gradient;
+          ctx.fillRect(canvas.width - 120, 0, 120, canvas.height);
+        }
+      }
+
       animFrameId = requestAnimationFrame(renderLoop);
     };
 
@@ -1108,20 +1150,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   }, [isPlaying, gameMode, difficulty, chopstickStyleId, showHelper, soundEnabled, frenzyActive]);
 
   // Handle Game Input Interactions (Clicks / Touches to PINCH)
-  const performPinchStrike = (clientX: number, clientY: number) => {
+  const performPinchStrike = (clientX?: number, clientY?: number) => {
     if (!isPlaying) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const hitX = clientX - rect.left;
-    const hitY = clientY - rect.top;
+    if (clientX !== undefined && clientY !== undefined) {
+      const rect = canvas.getBoundingClientRect();
+      mouseRef.current.x = clientX - rect.left;
+      mouseRef.current.y = clientY - rect.top;
+    }
 
-    // Update coordinates immediately to align strike location
-    mouseRef.current.x = hitX;
-    mouseRef.current.y = hitY;
     mouseRef.current.isPinching = true;
+
+    const hitX = mouseRef.current.x;
+    const hitY = mouseRef.current.y;
 
     const diffSettings = getDifficultySettings();
     const flies = fliesRef.current;
@@ -1264,19 +1308,85 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   // Touch handlers for mobile players
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!isPlaying || e.touches.length === 0) return;
-    const touch = e.touches[0];
-    performPinchStrike(touch.clientX, touch.clientY);
+    
+    if (Capacitor.isNativePlatform()) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const halfWidth = window.innerWidth / 2;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.clientX < halfWidth && !joystickRef.current.active) {
+          joystickRef.current = {
+            active: true,
+            id: touch.identifier,
+            baseX: touch.clientX - rect.left,
+            baseY: touch.clientY - rect.top,
+            thumbX: touch.clientX - rect.left,
+            thumbY: touch.clientY - rect.top,
+          };
+        } else if (touch.clientX >= halfWidth && !actionButtonRef.current.active) {
+          actionButtonRef.current = { active: true, id: touch.identifier };
+          performPinchStrike(); // Strike at current mouse location
+        }
+      }
+    } else {
+      const touch = e.touches[0];
+      performPinchStrike(touch.clientX, touch.clientY);
+    }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isPlaying || e.touches.length === 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    mouseRef.current.x = touch.clientX - rect.left;
-    mouseRef.current.y = touch.clientY - rect.top;
+
+    if (Capacitor.isNativePlatform()) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === joystickRef.current.id) {
+          const tx = touch.clientX - rect.left;
+          const ty = touch.clientY - rect.top;
+          
+          const dx = tx - joystickRef.current.baseX;
+          const dy = ty - joystickRef.current.baseY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const maxRadius = 45;
+          
+          if (dist > maxRadius) {
+            joystickRef.current.thumbX = joystickRef.current.baseX + (dx / dist) * maxRadius;
+            joystickRef.current.thumbY = joystickRef.current.baseY + (dy / dist) * maxRadius;
+          } else {
+            joystickRef.current.thumbX = tx;
+            joystickRef.current.thumbY = ty;
+          }
+        }
+      }
+    } else {
+      const touch = e.touches[0];
+      mouseRef.current.x = touch.clientX - rect.left;
+      mouseRef.current.y = touch.clientY - rect.top;
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!isPlaying) return;
+    if (Capacitor.isNativePlatform()) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (touch.identifier === joystickRef.current.id) {
+          joystickRef.current.active = false;
+        }
+        if (touch.identifier === actionButtonRef.current.id) {
+          actionButtonRef.current.active = false;
+          handleReleasePinch();
+        }
+      }
+    } else {
+      handleReleasePinch();
+    }
   };
 
   // Active Timers and fly counts manager
@@ -1380,7 +1490,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       onMouseUp={handleReleasePinch}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
-      onTouchEnd={handleReleasePinch}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
     >
       {/* High FPS Game Arena Canvas */}
       <canvas ref={canvasRef} id="arcade-game-canvas" className="block w-full h-full" />

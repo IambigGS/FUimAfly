@@ -225,7 +225,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.3 }}
-            className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 z-10 select-none overflow-y-auto"
+            className="flex-1 flex flex-col items-center justify-start md:justify-center pt-8 pb-12 px-4 md:p-8 z-10 select-none overflow-y-auto"
           >
             {/* Title Calligraphy Frame */}
             <div className="text-center max-w-xl mb-6 md:mb-10 z-10">
@@ -449,10 +449,42 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex-1 flex flex-col md:flex-row items-stretch justify-stretch z-10 select-none overflow-hidden"
+            className="flex-1 flex items-stretch justify-stretch z-10 select-none overflow-hidden relative"
           >
-            {/* Left/Top HUD Stats Panel */}
-            <div className="w-full md:w-80 bg-brand-ivory border-b-3 md:border-b-0 md:border-r-3 border-brand-charcoal p-5 flex flex-col justify-between z-20 shadow-none">
+            {/* Mobile Minimal HUD overlay */}
+            <div className="md:hidden absolute top-4 left-4 right-16 z-30 flex justify-between items-start pointer-events-none">
+              <div className="flex gap-2">
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-brand-charcoal px-3 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto">
+                  <span className="font-serif font-black text-xl text-brand-charcoal">{stats.score}</span>
+                </div>
+                {gameMode === 'arcade' && (
+                  <div className="bg-brand-red/90 backdrop-blur-sm border-2 border-brand-charcoal px-3 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto">
+                    <span className="font-mono font-bold text-white text-lg">{stats.gameTimeRemaining}s</span>
+                  </div>
+                )}
+                {gameMode === 'training' && (
+                  <div className="bg-brand-ivory/90 backdrop-blur-sm border-2 border-brand-charcoal px-2 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto flex items-center">
+                    <ShieldAlert className="w-4 h-4 text-brand-red mr-1" /> 
+                    <span className="font-mono font-bold text-brand-red">Guard</span>
+                  </div>
+                )}
+              </div>
+              
+              <button
+                onClick={() => {
+                  if (confirm('Return to Dojo Menu? Your active score will be lost.')) {
+                    setGameState('menu');
+                    audio.clearAllBuzzers();
+                  }
+                }}
+                className="pointer-events-auto px-3 py-1 bg-white/90 hover:bg-brand-linen border-2 border-brand-charcoal font-serif font-black shadow-[2px_2px_0px_0px_#1A1A1A] text-sm text-brand-charcoal"
+              >
+                Exit
+              </button>
+            </div>
+
+            {/* Left HUD Stats Panel (Hidden on Mobile) */}
+            <div className="hidden md:flex w-80 bg-brand-ivory border-r-3 border-brand-charcoal p-5 flex-col justify-between z-20 shadow-none">
               {/* Top Section */}
               <div className="space-y-4">
                 {/* Header back & Pause buttons */}
@@ -627,7 +659,7 @@ export default function App() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.3 }}
-            className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 z-10 overflow-y-auto"
+            className="flex-1 flex flex-col items-center justify-start md:justify-center pt-8 pb-12 px-4 md:p-8 z-10 overflow-y-auto"
           >
             <div className="w-full max-w-md bg-brand-ivory border-3 border-brand-charcoal rounded-none shadow-[8px_8px_0px_0px_#1A1A1A] p-6 md:p-8 text-brand-charcoal z-10">
               {/* Badge Emblem Header */}
