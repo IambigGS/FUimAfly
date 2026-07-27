@@ -139,6 +139,39 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     y: number;
   } | null>(null);
 
+  const initLevelDumplings = (level: number) => {
+    const totalCount = level === 1 ? 5 : 5 + (level - 1) * 2;
+    const plateX = window.innerWidth / 2;
+    const plateY = window.innerHeight * 0.70;
+    const radius = 36;
+
+    const list = [];
+    for (let i = 0; i < totalCount; i++) {
+      const angle = (i / totalCount) * Math.PI * 2;
+      const dx = Math.cos(angle) * (totalCount > 6 ? radius : radius * 0.7);
+      const dy = Math.sin(angle) * (totalCount > 6 ? radius * 0.5 : radius * 0.35);
+      list.push({
+        id: `dumpling_${level}_${i}`,
+        x: plateX + dx,
+        y: plateY + dy - 5,
+        origX: plateX + dx,
+        origY: plateY + dy - 5,
+        isEaten: false,
+        isBlockedByFly: false,
+      });
+    }
+    dumplingsRef.current = list;
+    dumplingsEatenThisLevelRef.current = 0;
+    dumplingsEatenSinceLastDrinkRef.current = 0;
+    sipNeededRef.current = false;
+    if (teaRef.current) {
+      teaRef.current.x = teaRef.current.origX;
+      teaRef.current.y = teaRef.current.origY;
+      teaRef.current.isBlockedByFly = false;
+      teaRef.current.flyId = undefined;
+    }
+  };
+
   // Plate state for Feast Guard
   const plateRef = useRef({
     x: window.innerWidth / 2,
