@@ -84,6 +84,22 @@ export default function App() {
     }
   }, []);
 
+  // Defensive Telegram Mini App Initialization
+  useEffect(() => {
+    try {
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        if (tg.setHeaderColor) tg.setHeaderColor('#1a1a1a');
+        if (tg.setBackgroundColor) tg.setBackgroundColor('#000000');
+        console.log('Telegram Mini App initialized cleanly on platform:', tg.platform);
+      }
+    } catch (e) {
+      console.warn('Telegram WebApp initialization skipped:', e);
+    }
+  }, []);
+
   // Update Volumes in global procedural synthesizer
   useEffect(() => {
     audio.setSoundEnabled(soundEnabled);

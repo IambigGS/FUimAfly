@@ -78,3 +78,22 @@ export interface GameStats {
   gameTimeRemaining: number; // in seconds, for arcade mode
   fliesTypeCount: Record<FlyType, number>;
 }
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: {
+        ready: () => void;
+        expand: () => void;
+        setHeaderColor?: (color: string) => void;
+        setBackgroundColor?: (color: string) => void;
+        platform?: string;
+        colorScheme?: 'light' | 'dark';
+        initDataUnsafe?: any;
+        isExpanded?: boolean;
+        close?: () => void;
+      };
+    };
+  }
+}
+

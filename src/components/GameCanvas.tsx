@@ -4,6 +4,17 @@ import { audio } from '../utils/audio';
 import { CHOPSTICK_STYLES } from './SettingsModal';
 import { Capacitor } from '@capacitor/core';
 
+export const isMobileOrTouchDevice = (): boolean => {
+  if (Capacitor.isNativePlatform()) return true;
+  if (typeof window !== 'undefined' && window.Telegram?.WebApp?.platform) {
+    const p = window.Telegram.WebApp.platform;
+    if (p === 'android' || p === 'ios' || p === 'mobile') return true;
+  }
+  const hasTouch = typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0));
+  const isMobileUA = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  return hasTouch || isMobileUA;
+};
+
 interface GameCanvasProps {
   isPlaying: boolean;
   gameMode: 'arcade' | 'zen' | 'training';
@@ -580,8 +591,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 2. Interpolate Chopsticks position (smooth trailing physics)
       const mouse = mouseRef.current;
 
-      // Mobile Joystick Movement
-      if (Capacitor.isNativePlatform() && joystickRef.current.active) {
+      // Mobile / Touch Joystick Movement
+      if (isMobileOrTouchDevice() && joystickRef.current.active) {
         const dx = joystickRef.current.thumbX - joystickRef.current.baseX;
         const dy = joystickRef.current.thumbY - joystickRef.current.baseY;
         mouse.x += dx * 0.22 * timeScaleRef.current;
@@ -1109,7 +1120,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.restore(); // Balance the camera save
       
       // 9. Draw Mobile Virtual Joystick and Action Hint (Outside camera transform so it stays fixed to screen)
-      if (Capacitor.isNativePlatform()) {
+      if (isMobileOrTouchDevice()) {
         if (joystickRef.current.active) {
           ctx.beginPath();
           ctx.arc(joystickRef.current.baseX, joystickRef.current.baseY, 45, 0, Math.PI * 2);
@@ -1309,7 +1320,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!isPlaying || e.touches.length === 0) return;
     
-    if (Capacitor.isNativePlatform()) {
+    if (isMobileOrTouchDevice()) {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -1343,7 +1354,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
 
-    if (Capacitor.isNativePlatform()) {
+    if (isMobileOrTouchDevice()) {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (touch.identifier === joystickRef.current.id) {
@@ -1373,7 +1384,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isPlaying) return;
-    if (Capacitor.isNativePlatform()) {
+    if (isMobileOrTouchDevice()) {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (touch.identifier === joystickRef.current.id) {
@@ -1388,6 +1399,56 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       handleReleasePinch();
     }
   };
+
+  // Desktop Keyboard Controls (WASD / Arrow Keys for movement, Space for pinch/strike)
+  useEffect(() => {
+    if (!isPlaying || isMobileOrTouchDevice()) return;
+
+    const keysPressed: Record<string, boolean> = {};
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      keysPressed[e.code] = true;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        performPinchStrike();
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      keysPressed[e.code] = false;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        handleReleasePinch();
+      }
+    };
+
+    const moveSpeed = 12;
+    const keyInterval = setInterval(() => {
+      if (!isPlaying) return;
+      let dx = 0;
+      let dy = 0;
+      if (keysPressed['KeyW'] || keysPressed['ArrowUp']) dy -= moveSpeed;
+      if (keysPressed['KeyS'] || keysPressed['ArrowDown']) dy += moveSpeed;
+      if (keysPressed['KeyA'] || keysPressed['ArrowLeft']) dx -= moveSpeed;
+      if (keysPressed['KeyD'] || keysPressed['ArrowRight']) dx += moveSpeed;
+
+      if (dx !== 0 || dy !== 0) {
+        mouseRef.current.x = Math.max(0, Math.min(window.innerWidth, mouseRef.current.x + dx));
+        mouseRef.current.y = Math.max(0, Math.min(window.innerHeight, mouseRef.current.y + dy));
+      }
+    }, 16);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      clearInterval(keyInterval);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isPlaying]);
 
   // Active Timers and fly counts manager
   useEffect(() => {
