@@ -131,34 +131,34 @@ export const HowToPlay: React.FC<HowToPlayProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Game Modes */}
+          {/* Dumpling Feast & Beverage Rules */}
           <div>
             <h3 className="font-serif font-black text-lg mb-3 flex items-center gap-2 text-brand-charcoal">
-              <Award className="w-5 h-5 text-brand-red" /> Training Modalities
+              <Award className="w-5 h-5 text-brand-red" /> The Master's Feast Rules
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
               <div className="bg-white p-3 border-2 border-brand-charcoal rounded-none">
                 <span className="font-mono text-xs uppercase text-brand-red font-bold block mb-1">
-                  Arcade Mode
+                  1. Feed Dumplings 🥟
                 </span>
                 <p className="text-xs text-brand-charcoal/85 leading-relaxed font-sans">
-                  60 seconds on the clock. Catch flies to earn score. Golden fly catches award extra precious seconds and start a score multiplier frenzy!
+                  Drag plump dumplings from the central steamer plate directly into Master's mouth on the right to eat them one by one.
                 </p>
               </div>
               <div className="bg-white p-3 border-2 border-brand-charcoal rounded-none">
-                <span className="font-mono text-xs uppercase text-emerald-700 font-bold block mb-1">
-                  Zen Mode
+                <span className="font-mono text-xs uppercase text-amber-700 font-bold block mb-1">
+                  2. Sip Carbonated Soda 🥤
                 </span>
                 <p className="text-xs text-brand-charcoal/85 leading-relaxed font-sans">
-                  No timers, no penalties, no rush. Listen to the gentle wind flute melody and master the delicate chopstick pinch in full tranquility.
+                  After 2 dumplings on Level 1 (and 3 on Level 2+), Master gets thirsty! Drag the fizzy yellow-orange soda tumbler to the mouth to take a sip.
                 </p>
               </div>
               <div className="bg-white p-3 border-2 border-brand-charcoal rounded-none">
                 <span className="font-mono text-xs uppercase text-indigo-700 font-bold block mb-1">
-                  Feast Guard
+                  3. Defend Feast Integrity 🪰
                 </span>
                 <p className="text-xs text-brand-charcoal/85 leading-relaxed font-sans">
-                  Keep flies away from the Master's delicious dumplings! Flies will actively zero in on the food on screen. Snatch them before they devour it.
+                  Flies frequently land on dumplings and the drink rim. Snatch landed flies quickly with chopsticks before they drain the circular Feast Integrity gauge!
                 </p>
               </div>
             </div>

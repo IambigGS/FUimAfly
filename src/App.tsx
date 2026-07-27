@@ -472,11 +472,7 @@ export default function App() {
                       DOJO ARENA
                     </span>
                     <h3 className="font-serif font-black text-lg text-brand-charcoal">
-                      {gameMode === 'arcade'
-                        ? 'Arcade Challenge'
-                        : gameMode === 'zen'
-                        ? 'Zen Meditation'
-                        : 'Feast Guard'}
+                      The Master's Feast 🥟🥤
                     </h3>
                   </div>
 
@@ -506,13 +502,13 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Matcha Sip Required Warning Banner */}
+                  {/* Soda Sip Required Warning Banner */}
                   {stats.sipNeeded && (
                     <div className="p-3 bg-amber-100 border-2 border-amber-800 rounded-none animate-pulse flex items-center justify-between text-amber-900 font-serif font-black text-xs">
                       <span className="flex items-center gap-1.5">
-                        🍵 Master is thirsty!
+                        🥤 Master is thirsty!
                       </span>
-                      <span className="underline decoration-amber-800">Drag Tea to Mouth</span>
+                      <span className="underline decoration-amber-800">Drag Soda to Mouth</span>
                     </div>
                   )}
 

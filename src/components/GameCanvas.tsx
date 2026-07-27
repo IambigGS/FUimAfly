@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Fly, FlyType, Particle, GameStats, ChopstickConfig } from '../types';
-import { audio } from '../utils/audio';
+import { audio, getAssetUrl } from '../utils/audio';
 import { CHOPSTICK_STYLES } from './SettingsModal';
 import { Capacitor } from '@capacitor/core';
 
@@ -97,30 +97,51 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     flyId?: string;
   }[]>([]);
 
+  // Image Asset Refs
+  const dumplingImgRef = useRef<HTMLImageElement | null>(null);
+  const drinkImgRef = useRef<HTMLImageElement | null>(null);
+  const mouthImgRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const dImg = new Image();
+    dImg.src = getAssetUrl('dumpling.jpg');
+    dImg.onload = () => { dumplingImgRef.current = dImg; };
+
+    const drImg = new Image();
+    drImg.src = getAssetUrl('drink.jpg');
+    drImg.onload = () => { drinkImgRef.current = drImg; };
+
+    const mImg = new Image();
+    mImg.src = getAssetUrl('mouth.jpg');
+    mImg.onload = () => { mouthImgRef.current = mImg; };
+  }, []);
+
   const teaRef = useRef<{
     x: number;
     y: number;
     origX: number;
     origY: number;
+    radius: number;
     isBlockedByFly: boolean;
     flyId?: string;
   }>({
-    x: window.innerWidth * 0.20,
+    x: window.innerWidth * 0.18,
     y: window.innerHeight * 0.68,
-    origX: window.innerWidth * 0.20,
+    origX: window.innerWidth * 0.18,
     origY: window.innerHeight * 0.68,
+    radius: 45,
     isBlockedByFly: false,
   });
 
   const mouthRef = useRef<{
     x: number;
     y: number;
-    radius: 55;
+    radius: number;
     isOpen: boolean;
   }>({
-    x: window.innerWidth * 0.80,
+    x: window.innerWidth * 0.82,
     y: window.innerHeight * 0.65,
-    radius: 55,
+    radius: 75,
     isOpen: false,
   });
 
@@ -139,23 +160,32 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     y: number;
   } | null>(null);
 
+  // Plate state for Dumpling Feast
+  const plateRef = useRef({
+    x: window.innerWidth / 2,
+    y: window.innerHeight * 0.70,
+    hp: 100,
+    active: true,
+    radius: 95,
+  });
+
   const initLevelDumplings = (level: number) => {
     const totalCount = level === 1 ? 5 : 5 + (level - 1) * 2;
-    const plateX = window.innerWidth / 2;
-    const plateY = window.innerHeight * 0.70;
-    const radius = 36;
+    const plateX = plateRef.current.x;
+    const plateY = plateRef.current.y;
+    const plateRadius = plateRef.current.radius || 95;
 
     const list = [];
     for (let i = 0; i < totalCount; i++) {
       const angle = (i / totalCount) * Math.PI * 2;
-      const dx = Math.cos(angle) * (totalCount > 6 ? radius : radius * 0.7);
-      const dy = Math.sin(angle) * (totalCount > 6 ? radius * 0.5 : radius * 0.35);
+      const dx = Math.cos(angle) * (totalCount > 6 ? plateRadius * 0.45 : plateRadius * 0.36);
+      const dy = Math.sin(angle) * (totalCount > 6 ? plateRadius * 0.26 : plateRadius * 0.20);
       list.push({
         id: `dumpling_${level}_${i}`,
         x: plateX + dx,
-        y: plateY + dy - 5,
+        y: plateY + dy - 8,
         origX: plateX + dx,
-        origY: plateY + dy - 5,
+        origY: plateY + dy - 8,
         isEaten: false,
         isBlockedByFly: false,
       });
@@ -164,6 +194,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     dumplingsEatenThisLevelRef.current = 0;
     dumplingsEatenSinceLastDrinkRef.current = 0;
     sipNeededRef.current = false;
+    plateRef.current.hp = 100;
+
     if (teaRef.current) {
       teaRef.current.x = teaRef.current.origX;
       teaRef.current.y = teaRef.current.origY;
@@ -171,15 +203,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       teaRef.current.flyId = undefined;
     }
   };
-
-  // Plate state for Feast Guard
-  const plateRef = useRef({
-    x: window.innerWidth / 2,
-    y: window.innerHeight * 0.70,
-    hp: 100,
-    active: false,
-    radius: 70,
-  });
 
   // Release Window state
   const releaseWindowRef = useRef({
@@ -625,206 +648,249 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       ctx.restore();
 
-      // 1. Draw Steaming Matcha Tea Cup (Left Side)
+      // 1. Draw Fizzy Carbonated Soda Tumbler (Left Side)
       const tea = teaRef.current;
       ctx.save();
-      // Saucer shadow & base
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+      
+      // Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
       ctx.beginPath();
-      ctx.ellipse(tea.x, tea.y + 18, 36, 12, 0, 0, Math.PI * 2);
+      ctx.ellipse(tea.x, tea.y + 36, 44, 14, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Saucer
-      ctx.fillStyle = '#654321';
-      ctx.strokeStyle = '#3e2723';
-      ctx.lineWidth = 2;
+      // Clear Glass Tumbler Outer Frame
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.ellipse(tea.x, tea.y + 14, 32, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Tea Bowl (Ceramic dark green/brown)
-      ctx.fillStyle = '#2d4a27';
-      ctx.strokeStyle = '#ebdcb9';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.ellipse(tea.x, tea.y, 26, 18, 0, 0, Math.PI * 2);
+      ctx.roundRect(tea.x - 30, tea.y - 35, 60, 70, 10);
       ctx.fill();
       ctx.stroke();
 
-      // Liquid Matcha (Vibrant Green)
-      ctx.fillStyle = '#4ade80';
+      // 3/4 Full Fizzy Yellow-Orange Beverage Liquid
+      const drinkGrad = ctx.createLinearGradient(tea.x, tea.y - 18, tea.x, tea.y + 30);
+      drinkGrad.addColorStop(0, '#f97316'); // Orange top
+      drinkGrad.addColorStop(1, '#eab308'); // Yellowish bottom
+      ctx.fillStyle = drinkGrad;
       ctx.beginPath();
-      ctx.ellipse(tea.x, tea.y - 2, 21, 13, 0, 0, Math.PI * 2);
+      ctx.roundRect(tea.x - 26, tea.y - 15, 52, 48, [0, 0, 8, 8]);
       ctx.fill();
 
-      // Steam rising from hot Matcha
-      const steamTime = Date.now() * 0.003;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(tea.x - 6, tea.y - 14);
-      ctx.quadraticCurveTo(tea.x - 12 + Math.sin(steamTime) * 4, tea.y - 30, tea.x - 6, tea.y - 45);
-      ctx.moveTo(tea.x + 6, tea.y - 14);
-      ctx.quadraticCurveTo(tea.x + 2 + Math.sin(steamTime + 1) * 4, tea.y - 30, tea.x + 6, tea.y - 45);
-      ctx.stroke();
+      // Ice Cubes floating
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(tea.x - 14, tea.y - 10, 14, 14);
+      ctx.strokeRect(tea.x - 14, tea.y - 10, 14, 14);
+      ctx.fillRect(tea.x + 2, tea.y - 5, 12, 12);
+      ctx.strokeRect(tea.x + 2, tea.y - 5, 12, 12);
+
+      // Carbonation Bubbles rising
+      const bubbleTime = Date.now() * 0.005;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      for (let b = 0; b < 6; b++) {
+        const bx = tea.x - 18 + ((b * 7) % 36);
+        const by = tea.y + 25 - ((bubbleTime * 20 + b * 15) % 38);
+        ctx.beginPath();
+        ctx.arc(bx, by, (b % 3) + 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw Glass Image overlay if loaded
+      if (drinkImgRef.current) {
+        ctx.globalAlpha = 0.35;
+        ctx.drawImage(drinkImgRef.current, tea.x - 30, tea.y - 35, 60, 70);
+        ctx.globalAlpha = 1.0;
+      }
 
       // Label
       ctx.fillStyle = '#6e5d4a';
       ctx.font = 'bold 10px JetBrains Mono, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('MATCHA TEA 🍵', tea.x, tea.y + 32);
+      ctx.fillText('FIZZY SODA 🥤', tea.x, tea.y + 52);
 
-      // Sip Needed Glowing Aura & Speech Bubble Prompt
+      // Sip Needed Glowing Pulse & Speech Bubble Prompt
       if (sipNeededRef.current) {
-        ctx.strokeStyle = '#eab308';
+        ctx.strokeStyle = '#f97316';
         ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.ellipse(tea.x, tea.y, 34 + Math.sin(Date.now() * 0.008) * 4, 24 + Math.sin(Date.now() * 0.008) * 4, 0, 0, Math.PI * 2);
+        ctx.ellipse(tea.x, tea.y, 42 + Math.sin(Date.now() * 0.008) * 5, 48 + Math.sin(Date.now() * 0.008) * 5, 0, 0, Math.PI * 2);
         ctx.stroke();
 
         // Speech Bubble
-        ctx.fillStyle = '#fef3c7';
-        ctx.strokeStyle = '#b45309';
+        ctx.fillStyle = '#ffedd5';
+        ctx.strokeStyle = '#c2410c';
         ctx.lineWidth = 2;
         ctx.beginPath();
         if (typeof ctx.roundRect === 'function') {
-          ctx.roundRect(tea.x - 55, tea.y - 65, 110, 24, 6);
+          ctx.roundRect(tea.x - 60, tea.y - 70, 120, 24, 6);
         } else {
-          ctx.rect(tea.x - 55, tea.y - 65, 110, 24);
+          ctx.rect(tea.x - 60, tea.y - 70, 120, 24);
         }
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#78350f';
+        ctx.fillStyle = '#7c2d12';
         ctx.font = 'bold 10px Georgia, serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Take a sip! 🍵', tea.x, tea.y - 49);
+        ctx.fillText('Take a sip! 🥤', tea.x, tea.y - 54);
       }
 
-      // Fly blocking warning badge on Tea Rim
+      // Fly blocking warning badge on Soda Rim
       if (tea.isBlockedByFly) {
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
-        ctx.arc(tea.x, tea.y - 20, 10, 0, Math.PI * 2);
+        ctx.arc(tea.x, tea.y - 42, 12, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px sans-serif';
+        ctx.font = 'bold 11px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('🪰', tea.x, tea.y - 16);
+        ctx.fillText('🪰', tea.x, tea.y - 38);
       }
       ctx.restore();
 
-      // 1.2 Draw Dumpling Steamer Plate (Center)
+      // 1.2 Draw Dumpling Steamer Plate & Feast Health Ring (Center)
       const plate = plateRef.current;
       ctx.save();
 
       // Bamboo Steamer Plate Shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
       ctx.beginPath();
-      ctx.ellipse(plate.x, plate.y + 15, plate.radius, plate.radius * 0.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(plate.x, plate.y + 20, plate.radius, plate.radius * 0.45, 0, 0, Math.PI * 2);
       ctx.fill();
 
       // Bamboo Steamer Plate Base
       ctx.fillStyle = '#d4a373';
       ctx.strokeStyle = '#8b5a2b';
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 5;
       ctx.beginPath();
-      ctx.ellipse(plate.x, plate.y, plate.radius, plate.radius * 0.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(plate.x, plate.y, plate.radius, plate.radius * 0.45, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
       // Plate Inner Rim
       ctx.strokeStyle = '#faedcd';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.ellipse(plate.x, plate.y, plate.radius * 0.85, plate.radius * 0.32, 0, 0, Math.PI * 2);
+      ctx.ellipse(plate.x, plate.y, plate.radius * 0.88, plate.radius * 0.38, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Circular Feast Integrity Gauge Ring
+      const hpPercent = Math.max(0, plate.hp / 100);
+      const ringRadiusX = plate.radius + 14;
+      const ringRadiusY = (plate.radius + 14) * 0.45;
+
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.ellipse(plate.x, plate.y, ringRadiusX, ringRadiusY, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const hpColor = plate.hp > 50 ? '#10b981' : plate.hp > 25 ? '#f59e0b' : '#ef4444';
+      ctx.strokeStyle = hpColor;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.ellipse(plate.x, plate.y, ringRadiusX, ringRadiusY, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpPercent);
       ctx.stroke();
 
       // Label
       ctx.fillStyle = '#6e5d4a';
       ctx.font = 'bold 10px JetBrains Mono, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`DUMPLINGS 🥟`, plate.x, plate.y + 35);
+      ctx.fillText(`FEAST INTEGRITY: ${Math.ceil(plate.hp)}% 🥟`, plate.x, plate.y + 55);
 
       // Render Dumplings on Plate
       dumplingsRef.current.forEach((d) => {
         if (d.isEaten) return;
 
         ctx.save();
-        // Shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+        // Dumpling Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
         ctx.beginPath();
-        ctx.ellipse(d.x, d.y + 6, 14, 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(d.x, d.y + 8, 16, 7, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Dumpling Body
-        ctx.fillStyle = '#fffdf5';
-        ctx.strokeStyle = '#e6ccb2';
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.ellipse(d.x, d.y, 14, 10, -0.1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        // Render generated Dumpling Image Asset if available
+        if (dumplingImgRef.current) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.ellipse(d.x, d.y, 18, 13, 0, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(dumplingImgRef.current, d.x - 20, d.y - 15, 40, 30);
+          ctx.restore();
 
-        // Pleat Folds Accent
-        ctx.strokeStyle = '#d7b99c';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(d.x - 8, d.y - 2);
-        ctx.quadraticCurveTo(d.x, d.y - 6, d.x + 8, d.y - 2);
-        ctx.stroke();
+          ctx.strokeStyle = '#d7b99c';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.ellipse(d.x, d.y, 18, 13, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // Dumpling Body fallback
+          ctx.fillStyle = '#fffdf5';
+          ctx.strokeStyle = '#e6ccb2';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(d.x, d.y, 18, 13, -0.1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
 
         // Fly blocking warning badge
         if (d.isBlockedByFly) {
           ctx.fillStyle = '#ef4444';
           ctx.beginPath();
-          ctx.arc(d.x, d.y - 12, 8, 0, Math.PI * 2);
+          ctx.arc(d.x, d.y - 14, 9, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 9px sans-serif';
+          ctx.font = 'bold 10px sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('🪰', d.x, d.y - 9);
+          ctx.fillText('🪰', d.x, d.y - 10);
         }
 
         ctx.restore();
       });
       ctx.restore();
 
-      // 1.3 Draw Target Mouth Frame (Right Side)
+      // 1.3 Draw Master Mouth Target (Right Side)
       const mouth = mouthRef.current;
       ctx.save();
 
+      const mouthRadius = mouth.isOpen ? mouth.radius * 1.15 : mouth.radius;
+
       // Outer Wooden Target Ring
       ctx.strokeStyle = mouth.isOpen ? '#eab308' : '#78350f';
-      ctx.lineWidth = mouth.isOpen ? 5 : 3;
-      ctx.fillStyle = mouth.isOpen ? 'rgba(254, 240, 138, 0.25)' : 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = mouth.isOpen ? 6 : 4;
+      ctx.fillStyle = mouth.isOpen ? 'rgba(254, 240, 138, 0.3)' : 'rgba(255, 255, 255, 0.05)';
       ctx.beginPath();
-      ctx.arc(mouth.x, mouth.y, mouth.radius, 0, Math.PI * 2);
+      ctx.arc(mouth.x, mouth.y, mouthRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // Mouth Avatar Graphic
-      ctx.fillStyle = mouth.isOpen ? '#991b1b' : '#7f1d1d';
-      ctx.beginPath();
-      if (mouth.isOpen) {
-        ctx.ellipse(mouth.x, mouth.y, 22, 18, 0, 0, Math.PI * 2);
+      // Render generated Mouth Image Asset inside frame if available
+      if (mouthImgRef.current) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(mouth.x, mouth.y, mouthRadius - 4, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(mouthImgRef.current, mouth.x - mouthRadius, mouth.y - mouthRadius, mouthRadius * 2, mouthRadius * 2);
+        ctx.restore();
       } else {
-        ctx.arc(mouth.x, mouth.y - 4, 18, 0.1, Math.PI - 0.1);
+        // Mouth Graphic Fallback
+        ctx.fillStyle = mouth.isOpen ? '#991b1b' : '#7f1d1d';
+        ctx.beginPath();
+        if (mouth.isOpen) {
+          ctx.ellipse(mouth.x, mouth.y, 30, 24, 0, 0, Math.PI * 2);
+        } else {
+          ctx.arc(mouth.x, mouth.y - 5, 25, 0.1, Math.PI - 0.1);
+        }
+        ctx.fill();
       }
-      ctx.fill();
-
-      // Teeth / Lip Accent
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.rect(mouth.x - 10, mouth.y - 12, 20, 4);
-      ctx.fill();
 
       // Label
       ctx.fillStyle = '#6e5d4a';
-      ctx.font = 'bold 10px JetBrains Mono, monospace';
+      ctx.font = 'bold 11px JetBrains Mono, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('MASTER 👄', mouth.x, mouth.y + mouth.radius + 18);
+      ctx.fillText('MASTER 👄', mouth.x, mouth.y + mouthRadius + 20);
 
       ctx.restore();
 
@@ -1034,12 +1100,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             fly.vx *= 0.8;
             fly.vy *= 0.8;
 
-            // Damage the feast
-            plateRef.current.hp = Math.max(0, plateRef.current.hp - 0.05);
+            // Damage the feast integrity while landed
+            plateRef.current.hp = Math.max(0, plateRef.current.hp - 0.14 * timeScaleRef.current);
 
             // Chomp particle text occasionally
-            if (Math.random() < 0.008) {
-              addFloatingText(fly.x, fly.y - 12, 'Chomp!', '#b45309');
+            if (Math.random() < 0.012) {
+              addFloatingText(fly.x, fly.y - 12, 'Chomp!', '#ef4444');
             }
           } else if (fly.state !== 'escaping') {
             // Gently steer towards dumpling plate
@@ -1907,58 +1973,53 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     currentZoom.current = 1.0;
     onStatsUpdate({ ...statsRef.current });
 
-    // Spawn ticker to keep fly count consistent or increase in difficulty
+    // Spawn and landing ticker to direct flies to dumplings and soda rim
     spawnTimerRef.current = window.setInterval(() => {
-      const activeFlies = fliesRef.current.filter(f => !f.isCaught).length;
-      const cap = frenzyActive ? 8 : 4;
+      const activeFlies = fliesRef.current.filter(f => !f.isCaught && f.state !== 'releasing');
+      const cap = frenzyActive ? 8 : 5;
       
-      if (activeFlies < cap) {
+      if (activeFlies.length < cap) {
         fliesRef.current.push(createFly());
       }
-    }, 3800);
 
-    // Second Ticker for Arcade Mode or Feast Guard
+      // Target flies to land on unblocked Dumplings or Soda Rim
+      const unlandedFlies = fliesRef.current.filter(f => !f.isCaught && f.state !== 'resting' && f.state !== 'releasing');
+      if (unlandedFlies.length > 0) {
+        const targetFly = unlandedFlies[Math.floor(Math.random() * unlandedFlies.length)];
+        
+        // 40% chance to target Soda Rim, 60% chance to target Dumpling
+        if (Math.random() < 0.4 && !teaRef.current.isBlockedByFly) {
+          teaRef.current.isBlockedByFly = true;
+          teaRef.current.flyId = targetFly.id;
+          targetFly.landingTargetId = 'tea';
+        } else {
+          const unblockedDumplings = dumplingsRef.current.filter(d => !d.isEaten && !d.isBlockedByFly);
+          if (unblockedDumplings.length > 0) {
+            const targetDumpling = unblockedDumplings[Math.floor(Math.random() * unblockedDumplings.length)];
+            targetDumpling.isBlockedByFly = true;
+            targetDumpling.flyId = targetFly.id;
+            targetDumpling.landingTargetId = targetDumpling.id;
+          }
+        }
+      }
+    }, 2200);
+
+    // Second Ticker for Feast Health Drain & Ninja Fly Spawns
     secondTimerRef.current = window.setInterval(() => {
       const stats = statsRef.current;
       
-      // Natural Spawning condition for Ninja Fly
-      if (!hasSpawnedNinjaThisSession.current) {
-        let shouldSpawn = false;
-        if (gameMode === 'arcade' && stats.gameTimeRemaining === 40) {
-          shouldSpawn = true;
-        } else if (gameMode !== 'arcade' && stats.fliesCaught >= 5) {
-          shouldSpawn = true;
-        }
-
-        if (shouldSpawn) {
-          hasSpawnedNinjaThisSession.current = true;
-          fliesRef.current.push(createFly('ninja'));
-        }
+      // Spawning condition for Ninja Fly
+      if (!hasSpawnedNinjaThisSession.current && stats.fliesCaught >= 4) {
+        hasSpawnedNinjaThisSession.current = true;
+        fliesRef.current.push(createFly('ninja'));
       }
 
-      if (gameMode === 'arcade') {
-        stats.gameTimeRemaining--;
-
-        // Low time warning beep
-        if (stats.gameTimeRemaining <= 10 && stats.gameTimeRemaining > 0 && soundEnabled) {
-          audio.playSfx('time-warning');
+      // Check Feast Health status
+      if (plateRef.current.hp <= 0) {
+        if (soundEnabled) {
+          audio.playSfx('game-over');
         }
-
-        if (stats.gameTimeRemaining <= 0) {
-          // Time Over!
-          if (soundEnabled) {
-            audio.playSfx('game-over');
-          }
-          onGameEnd({ ...stats });
-        }
-      } else if (gameMode === 'training') {
-        // Feast Guard mode
-        if (plateRef.current.hp <= 0) {
-          if (soundEnabled) {
-            audio.playSfx('game-over');
-          }
-          onGameEnd({ ...stats });
-        }
+        onGameEnd({ ...stats });
       }
 
       onStatsUpdate({ ...stats });
