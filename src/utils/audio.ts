@@ -329,6 +329,64 @@ class AudioEngine {
     }
   }
 
+  // Play dumpling munch sound
+  playMunch() {
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    [0, 0.08].forEach((delay) => {
+      const bufferSize = ctx.sampleRate * 0.04;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(600 + Math.random() * 200, now + delay);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.35, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.035);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.sfxGain!);
+      noise.start(now + delay);
+      noise.stop(now + delay + 0.04);
+    });
+  }
+
+  // Play matcha tea gulp sound
+  playGulp() {
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.15);
+
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
   // Continuous Fly Buzzing Management
   updateFlyBuzz(flyId: string, options: {
     pitch: number;      // around 80 - 150 Hz

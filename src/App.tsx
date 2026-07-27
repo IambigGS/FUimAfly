@@ -263,69 +263,27 @@ export default function App() {
               <div className="lg:col-span-7 bg-brand-ivory border-3 border-brand-charcoal rounded-none p-5 md:p-6 flex flex-col justify-between shadow-[6px_6px_0px_0px_#1A1A1A]">
                 <div className="space-y-4">
                   <h2 className="font-serif font-black text-xl text-brand-charcoal flex items-center gap-2">
-                    <Target className="w-5 h-5 text-brand-red" /> Select Your Path
+                    <Target className="w-5 h-5 text-brand-red" /> The Master's Feast
                   </h2>
 
                   <div className="space-y-3">
-                    {/* Arcade Mode Button */}
+                    {/* Unified Main Game Button */}
                     <button
                       onClick={() => handleStartGame('arcade')}
-                      id="play-arcade-btn"
-                      className="w-full text-left p-4 rounded-none border-2 border-brand-charcoal bg-white hover:bg-brand-linen hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-start justify-between"
+                      id="play-feast-btn"
+                      className="w-full text-left p-5 rounded-none border-3 border-brand-charcoal bg-white hover:bg-brand-linen hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[5px_5px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-start justify-between"
                     >
-                      <div className="space-y-1 pr-4">
-                        <span className="font-serif font-black text-base text-brand-charcoal group-hover:text-brand-red flex items-center gap-1.5 transition-colors">
-                          Arcade Mode <Clock className="w-4 h-4 text-brand-red" />
+                      <div className="space-y-1.5 pr-4">
+                        <span className="font-serif font-black text-lg text-brand-charcoal group-hover:text-brand-red flex items-center gap-2 transition-colors">
+                          Enter Dumpling Feast 🥟🍵
                         </span>
                         <p className="text-xs text-brand-charcoal/80 leading-relaxed font-sans">
-                          Test your absolute speed! Catch as many flies as possible in 60 seconds. Golden flies trigger a 2x points frenzy.
+                          Feed the Master freshly-steamed dumplings and sip Matcha tea! Keep pesky flies off the food and drink using your chopsticks.
                         </p>
                       </div>
                       <div className="h-full flex items-center">
-                        <span className="p-2 border-2 border-brand-charcoal rounded-none bg-brand-ivory text-brand-charcoal group-hover:bg-brand-red group-hover:text-white transition-colors">
-                          <Play className="w-4 h-4 fill-current" />
-                        </span>
-                      </div>
-                    </button>
-
-                    {/* Zen Mode Button */}
-                    <button
-                      onClick={() => handleStartGame('zen')}
-                      id="play-zen-btn"
-                      className="w-full text-left p-4 rounded-none border-2 border-brand-charcoal bg-white hover:bg-brand-linen hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-start justify-between"
-                    >
-                      <div className="space-y-1 pr-4">
-                        <span className="font-serif font-black text-base text-brand-charcoal group-hover:text-brand-red flex items-center gap-1.5 transition-colors">
-                          Zen Practice <Sparkles className="w-4 h-4 text-emerald-700" />
-                        </span>
-                        <p className="text-xs text-brand-charcoal/80 leading-relaxed font-sans">
-                          Peaceful endless practice. Master the delicate pinching technique at your own speed with relaxing flute melodies.
-                        </p>
-                      </div>
-                      <div className="h-full flex items-center">
-                        <span className="p-2 border-2 border-brand-charcoal rounded-none bg-brand-ivory text-brand-charcoal group-hover:bg-brand-red group-hover:text-white transition-colors">
-                          <Play className="w-4 h-4 fill-current" />
-                        </span>
-                      </div>
-                    </button>
-
-                    {/* Dumpling Feast Guard Mode Button */}
-                    <button
-                      onClick={() => handleStartGame('training')}
-                      id="play-feastguard-btn"
-                      className="w-full text-left p-4 rounded-none border-2 border-brand-charcoal bg-white hover:bg-brand-linen hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[4px_4px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-start justify-between"
-                    >
-                      <div className="space-y-1 pr-4">
-                        <span className="font-serif font-black text-base text-brand-charcoal group-hover:text-brand-red flex items-center gap-1.5 transition-colors">
-                          Feast Guard <Award className="w-4 h-4 text-indigo-700" />
-                        </span>
-                        <p className="text-xs text-brand-charcoal/80 leading-relaxed font-sans">
-                          Protect the Master's freshly-steamed dumplings! Snatch flies out of the air before they land and devour the meal.
-                        </p>
-                      </div>
-                      <div className="h-full flex items-center">
-                        <span className="p-2 border-2 border-brand-charcoal rounded-none bg-brand-ivory text-brand-charcoal group-hover:bg-brand-red group-hover:text-white transition-colors">
-                          <Play className="w-4 h-4 fill-current" />
+                        <span className="p-3 border-2 border-brand-charcoal rounded-none bg-brand-red text-white group-hover:bg-brand-charcoal transition-colors">
+                          <Play className="w-5 h-5 fill-current" />
                         </span>
                       </div>
                     </button>
@@ -534,36 +492,23 @@ export default function App() {
 
                 {/* Main Stats Display */}
                 <div className="space-y-3 pt-3 border-t-2 border-brand-charcoal">
-                  {/* Timer (Arcade Mode only) */}
-                  {gameMode === 'arcade' && (
-                    <div className="p-3 bg-white border-2 border-brand-charcoal rounded-none">
-                      <div className="flex justify-between items-center text-xs text-brand-charcoal font-black font-serif mb-1.5">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-brand-red" /> Time Remaining
-                        </span>
-                        <span className="font-mono">{stats.gameTimeRemaining}s</span>
-                      </div>
-                      <div className="w-full bg-brand-linen h-3 border-2 border-brand-charcoal rounded-none overflow-hidden">
-                        <div
-                          className="bg-brand-red h-full transition-all duration-1000"
-                          style={{ width: `${(stats.gameTimeRemaining / 60) * 100}%` }}
-                        />
-                      </div>
+                  {/* Level & Dumplings Counter */}
+                  <div className="p-3 bg-white border-2 border-brand-charcoal rounded-none">
+                    <div className="flex justify-between items-center text-xs text-brand-charcoal font-black font-serif mb-1">
+                      <span className="flex items-center gap-1">
+                        <Award className="w-3.5 h-3.5 text-brand-red" /> Level {stats.level || 1}
+                      </span>
+                      <span className="font-mono text-brand-charcoal font-bold">{stats.dumplingsLeft || 0} Dumplings Left</span>
                     </div>
-                  )}
+                  </div>
 
-                  {/* Dumpling Feast HP (Dumpling Guard mode only) */}
-                  {gameMode === 'training' && (
-                    <div className="p-3 bg-white border-2 border-brand-charcoal rounded-none">
-                      <div className="flex justify-between items-center text-xs text-brand-charcoal font-black font-serif mb-1">
-                        <span className="flex items-center gap-1">
-                          <ShieldAlert className="w-3.5 h-3.5 text-brand-red" /> Feast Safety
-                        </span>
-                        <span className="font-mono text-brand-red font-bold">Defend the Food!</span>
-                      </div>
-                      <p className="text-[10px] text-brand-charcoal/70 mb-1 leading-tight font-sans">
-                        Flies will fly towards the dumplings in the center. Snatch them to protect the meal!
-                      </p>
+                  {/* Matcha Sip Required Warning Banner */}
+                  {stats.sipNeeded && (
+                    <div className="p-3 bg-amber-100 border-2 border-amber-800 rounded-none animate-pulse flex items-center justify-between text-amber-900 font-serif font-black text-xs">
+                      <span className="flex items-center gap-1.5">
+                        🍵 Master is thirsty!
+                      </span>
+                      <span className="underline decoration-amber-800">Drag Tea to Mouth</span>
                     </div>
                   )}
 

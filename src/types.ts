@@ -27,6 +27,10 @@ export interface Fly {
   state: 'flying' | 'hovering' | 'resting' | 'escaping' | 'releasing';
   isCatchable?: boolean;
   narrativeStartTime?: number;
+  landingTargetId?: string;
+  landingType?: 'dumpling' | 'tea' | 'none';
+  landedTime?: number;
+  buzzLoopTimer?: number;
 }
 
 export interface Particle {
@@ -68,6 +72,23 @@ export interface ChopstickConfig {
   description: string;
 }
 
+export interface Dumpling {
+  id: string;
+  x: number;
+  y: number;
+  isEaten: boolean;
+  isBlockedByFly: boolean;
+  flyId?: string;
+}
+
+export interface TeaCup {
+  x: number;
+  y: number;
+  isBlockedByFly: boolean;
+  flyId?: string;
+  sipRequired: boolean;
+}
+
 export interface GameStats {
   score: number;
   fliesCaught: number;
@@ -77,6 +98,10 @@ export interface GameStats {
   maxCombo: number;
   gameTimeRemaining: number; // in seconds, for arcade mode
   fliesTypeCount: Record<FlyType, number>;
+  level: number;
+  dumplingsLeft: number;
+  dumplingsEatenThisLevel: number;
+  sipNeeded: boolean;
 }
 
 declare global {
