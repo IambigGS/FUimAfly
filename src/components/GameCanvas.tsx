@@ -740,12 +740,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (tea.isBlockedByFly) {
         ctx.fillStyle = '#ef4444';
         ctx.beginPath();
-        ctx.arc(tea.x, tea.y - 42, 12, 0, Math.PI * 2);
+        ctx.arc(tea.x, tea.y - 42, 11, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 11px sans-serif';
+        ctx.font = 'bold 12px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('🪰', tea.x, tea.y - 38);
+        ctx.fillText('!', tea.x, tea.y - 38);
       }
       ctx.restore();
 
@@ -839,12 +839,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         if (d.isBlockedByFly) {
           ctx.fillStyle = '#ef4444';
           ctx.beginPath();
-          ctx.arc(d.x, d.y - 14, 9, 0, Math.PI * 2);
+          ctx.arc(d.x, d.y - 14, 10, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 10px sans-serif';
+          ctx.font = 'bold 11px sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('🪰', d.x, d.y - 10);
+          ctx.fillText('!', d.x, d.y - 10);
         }
 
         ctx.restore();
@@ -1576,6 +1576,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const fly = flies[caughtFlyIndex];
       fly.isCaught = true;
       fly.caughtTime = Date.now();
+      fly.state = 'flying';
+
+      // Unblock food or soda glass instantly when fly is caught!
+      if (fly.landingTargetId) {
+        if (fly.landingTargetId === 'tea') {
+          teaRef.current.isBlockedByFly = false;
+          teaRef.current.flyId = undefined;
+        } else {
+          const d = dumplingsRef.current.find((dum) => dum.id === fly.landingTargetId);
+          if (d) {
+            d.isBlockedByFly = false;
+            d.flyId = undefined;
+          }
+        }
+        fly.landingTargetId = undefined;
+      }
 
       // Sparkle Splashes
       createCaptureParticles(fly.x, fly.y, fly.color, 10);
@@ -1672,35 +1688,38 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     mouseRef.current.x = mx;
     mouseRef.current.y = my;
 
-    // 1. Check if clicking on an unblocked Dumpling
+    // 1. Check if clicking on a Dumpling
     const dumplings = dumplingsRef.current;
-    let clickedDumplingIndex = -1;
     for (let i = 0; i < dumplings.length; i++) {
       const d = dumplings[i];
-      if (!d.isEaten && getDistance(mx, my, d.x, d.y) <= 24) {
-        if (!d.isBlockedByFly) {
-          clickedDumplingIndex = i;
+      if (!d.isEaten && getDistance(mx, my, d.x, d.y) <= 30) {
+        if (d.isBlockedByFly) {
+          // Fly landed on dumpling! Snatch fly first to unblock!
+          performPinchStrike(e.clientX, e.clientY);
+          return;
+        } else {
+          // Unblocked dumpling -> pick up for drag!
+          dragItemRef.current = {
+            type: 'dumpling',
+            id: d.id,
+            index: i,
+            startX: mx,
+            startY: my,
+          };
+          return;
         }
-        break;
       }
     }
 
-    if (clickedDumplingIndex !== -1) {
-      const d = dumplings[clickedDumplingIndex];
-      dragItemRef.current = {
-        type: 'dumpling',
-        id: d.id,
-        index: clickedDumplingIndex,
-        startX: mx,
-        startY: my,
-      };
-      return;
-    }
-
-    // 2. Check if clicking on unblocked Matcha Tea Cup
+    // 2. Check if clicking on Soda Tumbler
     const tea = teaRef.current;
-    if (getDistance(mx, my, tea.x, tea.y) <= 34) {
-      if (!tea.isBlockedByFly) {
+    if (getDistance(mx, my, tea.x, tea.y) <= 45) {
+      if (tea.isBlockedByFly) {
+        // Fly landed on soda rim! Snatch fly first to unblock!
+        performPinchStrike(e.clientX, e.clientY);
+        return;
+      } else {
+        // Unblocked soda glass -> pick up for drag!
         dragItemRef.current = {
           type: 'tea',
           startX: mx,
@@ -1710,7 +1729,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
     }
 
-    // 3. Otherwise perform Chopstick Pinch Strike to catch flies!
+    // 3. Otherwise perform Chopstick Pinch Strike to catch flies in open space!
     performPinchStrike(e.clientX, e.clientY);
   };
 
