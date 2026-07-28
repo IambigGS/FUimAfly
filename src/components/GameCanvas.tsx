@@ -745,18 +745,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.textAlign = 'center';
         ctx.fillText('Take a sip! 🥤', tea.x, tea.y - 54);
       }
-
-      // Fly blocking warning badge on Soda Rim
-      if (tea.isBlockedByFly) {
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath();
-        ctx.arc(tea.x, tea.y - 42, 11, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('!', tea.x, tea.y - 38);
-      }
       ctx.restore();
 
       // 1.2 Draw Dumpling Steamer Plate & Feast Health Ring (Center)
@@ -843,18 +831,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.ellipse(d.x, d.y, 18, 13, -0.1, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
-        }
-
-        // Fly blocking warning badge
-        if (d.isBlockedByFly) {
-          ctx.fillStyle = '#ef4444';
-          ctx.beginPath();
-          ctx.arc(d.x, d.y - 14, 10, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 11px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('!', d.x, d.y - 10);
         }
 
         ctx.restore();

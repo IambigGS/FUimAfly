@@ -91,6 +91,13 @@ export default function App() {
       if (tg) {
         tg.ready();
         tg.expand();
+        if (typeof tg.requestFullscreen === 'function') {
+          try {
+            tg.requestFullscreen();
+          } catch (e) {
+            console.warn('requestFullscreen on Telegram load:', e);
+          }
+        }
         if (tg.setHeaderColor) tg.setHeaderColor('#1a1a1a');
         if (tg.setBackgroundColor) tg.setBackgroundColor('#000000');
         console.log('Telegram Mini App initialized cleanly on platform:', tg.platform);
@@ -121,6 +128,18 @@ export default function App() {
   // Start the Game
   const handleStartGame = (mode: GameMode) => {
     audio.resume();
+    
+    // Request Telegram Mini App max screen expansion on user interaction
+    try {
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
+        tg.expand();
+        if (typeof tg.requestFullscreen === 'function') {
+          tg.requestFullscreen();
+        }
+      }
+    } catch (e) {}
+
     setGameMode(mode);
     setGameState('playing');
     // Reset stats
