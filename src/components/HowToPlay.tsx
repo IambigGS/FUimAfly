@@ -81,21 +81,15 @@ export const HowToPlay: React.FC<HowToPlayProps> = ({ onClose }) => {
             <h3 className="font-serif font-black text-lg flex items-center gap-2 text-brand-charcoal">
               <Target className="w-5 h-5 text-brand-red" /> Core Technique
             </h3>
-            <ul className="list-disc list-inside space-y-1 text-sm text-brand-charcoal/90 leading-relaxed font-serif font-medium">
+            <ul className="list-disc list-inside space-y-2 text-sm text-brand-charcoal/90 leading-relaxed font-serif font-medium">
               <li>
-                <strong className="text-brand-charcoal">Aim with Precision:</strong> The active pinch zone is located at the <span className="underline decoration-brand-red decoration-2 font-bold font-sans">TIPS</span> of the chopsticks, highlighted by the glowing crosshair guide.
+                <strong className="text-brand-charcoal">Mobile Control:</strong> Tap directly on any fly! Your chopsticks will automatically sweep in, capture the fly, carry it to the Garden Window, and release it safely.
               </li>
               <li>
-                <strong className="text-brand-charcoal">Pinch to Strike:</strong> Click or hold your mouse button (or tap and hold on mobile) to pinch the chopsticks together.
+                <strong className="text-brand-charcoal">Desktop Mouse Control:</strong> Move your mouse to position the chopstick tips, then click and hold to pinch and capture flies. Carry them to the top **Garden Window** to release!
               </li>
               <li>
-                <strong className="text-brand-charcoal">Capture with Care:</strong> Align your chopsticks tips, pinch and hold to capture the fly unharmed!
-              </li>
-              <li>
-                <strong className="text-brand-charcoal">Release to Freedom:</strong> While holding your pinch, carry the fly up to the **Garden Window** at the top center to release it safely out to nature for points and combos! Letting go inside the room will safely release the fly back to the dojo.
-              </li>
-              <li>
-                <strong className="text-brand-charcoal">Combo Multipliers:</strong> Releasing flies consecutively without missing or dropping them inside the room builds your **Combo**. Strike misses will reset your multiplier!
+                <strong className="text-brand-charcoal">Combo Multipliers:</strong> Catching and releasing flies consecutively without missing builds your **Combo** multiplier for bonus points!
               </li>
             </ul>
           </div>

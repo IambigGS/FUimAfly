@@ -12,8 +12,12 @@ class AudioEngine {
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   
-  // Loaded fly audio buffers
+  // Loaded fly audio buffers by category
   private flyBuffers: AudioBuffer[] = [];
+  private landedDrinkBuffers: AudioBuffer[] = [];
+  private landedDumplingBuffers: AudioBuffer[] = [];
+  private capturedBuffers: AudioBuffer[] = [];
+  private ninjaBuffers: AudioBuffer[] = [];
   
   // Continuous fly buzzing nodes mapped by Fly ID
   private flyBuzzers: Map<string, {
@@ -23,6 +27,7 @@ class AudioEngine {
     gain: GainNode;
     panner: StereoPannerNode | null;
     soundIndex: number;
+    category: 'flying' | 'landed_drink' | 'landed_dumpling' | 'captured';
   }> = new Map();
 
   // Zen Flute state
@@ -59,36 +64,61 @@ class AudioEngine {
       this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime);
       this.sfxGain.connect(this.masterGain);
 
-      this.loadFlySounds();
+      this.loadAllFlySounds();
     } catch (e) {
       console.error('Failed to initialize Web Audio API:', e);
     }
   }
 
-  private async loadFlySounds() {
-    if (!this.ctx) return;
-    const maxSounds = 10;
+  private async discoverSoundsInFolder(folderPath: string, filePrefix: string, maxProbe = 20): Promise<AudioBuffer[]> {
+    if (!this.ctx) return [];
     const buffers: AudioBuffer[] = [];
     
-    for (let i = 1; i <= maxSounds; i++) {
-      try {
-        const soundUrl = getAssetUrl(`sounds/flies/fly_sound_${i}.mp3`);
-        const response = await fetch(soundUrl);
-        if (!response.ok) {
-          // No more consecutive files found, stop checking
-          break;
+    for (let i = 1; i <= maxProbe; i++) {
+      let primaryUrl = getAssetUrl(`sounds/flies/${folderPath}/${filePrefix}_${i}.mp3`);
+      let response = await fetch(primaryUrl).catch(() => null);
+
+      if (!response || !response.ok) {
+        // Fallback paths for flat structure / legacy folders
+        if (folderPath === 'flying') {
+          const fallbackUrl = getAssetUrl(`sounds/flies/${filePrefix}_${i}.mp3`);
+          response = await fetch(fallbackUrl).catch(() => null);
+        } else if (folderPath === 'ninja') {
+          const fallbackUrl = getAssetUrl(`sounds/flies/Flyby/flyBy_sound_${i}.mp3`);
+          response = await fetch(fallbackUrl).catch(() => null);
         }
+      }
+
+      if (!response || !response.ok) {
+        break; // Stop checking after first non-existent index
+      }
+
+      try {
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer);
         buffers.push(audioBuffer);
       } catch (e) {
-        // Log warning but break (safely stop loading consecutive files)
-        console.warn(`Dynamic fly sound loading stopped at index ${i}:`, e);
+        console.warn(`Dynamic audio decode stopped at ${folderPath}/${filePrefix}_${i}.mp3:`, e);
         break;
       }
     }
-    this.flyBuffers = buffers;
-    console.log(`Successfully loaded ${this.flyBuffers.length} fly sounds consecutively.`);
+    return buffers;
+  }
+
+  private async loadAllFlySounds() {
+    if (!this.ctx) return;
+    this.flyBuffers = await this.discoverSoundsInFolder('flying', 'fly_sound');
+    this.landedDrinkBuffers = await this.discoverSoundsInFolder('landed_drink', 'landed_drink');
+    this.landedDumplingBuffers = await this.discoverSoundsInFolder('landed_dumpling', 'landed_dumpling');
+    this.capturedBuffers = await this.discoverSoundsInFolder('captured', 'captured');
+    this.ninjaBuffers = await this.discoverSoundsInFolder('ninja', 'ninja');
+
+    // Fallbacks if specific state folders are missing or empty
+    if (this.landedDrinkBuffers.length === 0) this.landedDrinkBuffers = this.flyBuffers;
+    if (this.landedDumplingBuffers.length === 0) this.landedDumplingBuffers = this.flyBuffers;
+    if (this.capturedBuffers.length === 0) this.capturedBuffers = this.flyBuffers;
+
+    console.log(`Fly sounds loaded: flying=${this.flyBuffers.length}, drink=${this.landedDrinkBuffers.length}, dumpling=${this.landedDumplingBuffers.length}, captured=${this.capturedBuffers.length}, ninja=${this.ninjaBuffers.length}`);
   }
 
   resume() {
@@ -387,18 +417,78 @@ class AudioEngine {
     osc.stop(now + 0.2);
   }
 
-  // Continuous Fly Buzzing Management
+  private getBuffersForCategory(category: 'flying' | 'landed_drink' | 'landed_dumpling' | 'captured'): AudioBuffer[] {
+    switch (category) {
+      case 'landed_drink':
+        return this.landedDrinkBuffers.length > 0 ? this.landedDrinkBuffers : this.flyBuffers;
+      case 'landed_dumpling':
+        return this.landedDumplingBuffers.length > 0 ? this.landedDumplingBuffers : this.flyBuffers;
+      case 'captured':
+        return this.capturedBuffers.length > 0 ? this.capturedBuffers : this.flyBuffers;
+      case 'flying':
+      default:
+        return this.flyBuffers;
+    }
+  }
+
+  private startSourceForBuzzer(
+    flyId: string,
+    buzzer: {
+      source?: AudioBufferSourceNode;
+      gain: GainNode;
+      soundIndex: number;
+      category: 'flying' | 'landed_drink' | 'landed_dumpling' | 'captured';
+    },
+    pitch: number
+  ) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const buffers = this.getBuffersForCategory(buzzer.category);
+
+    if (buffers.length === 0) return;
+
+    // Pick random sound index different from current soundIndex if >1 sound available
+    let nextIndex = Math.floor(Math.random() * buffers.length);
+    if (buffers.length > 1 && nextIndex === buzzer.soundIndex) {
+      nextIndex = (nextIndex + 1) % buffers.length;
+    }
+    buzzer.soundIndex = nextIndex;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffers[nextIndex];
+    source.loop = false; // Non-looping, when ended we trigger next sound randomly
+
+    const targetRate = pitch / 100;
+    source.playbackRate.setValueAtTime(targetRate, ctx.currentTime);
+    source.connect(buzzer.gain);
+
+    source.onended = () => {
+      const currentBuzzer = this.flyBuzzers.get(flyId);
+      if (currentBuzzer && currentBuzzer.source === source) {
+        this.startSourceForBuzzer(flyId, currentBuzzer, pitch);
+      }
+    };
+
+    buzzer.source = source;
+    try {
+      source.start(0);
+    } catch (e) {}
+  }
+
+  // Continuous Fly Buzzing Management with State Categories
   updateFlyBuzz(flyId: string, options: {
     pitch: number;      // around 80 - 150 Hz
     volumeMultiplier: number; // 0 to 1 based on speed/proximity
     panX: number;       // -1 (left) to 1 (right)
     isActive: boolean;
+    soundCategory?: 'flying' | 'landed_drink' | 'landed_dumpling' | 'captured';
   }) {
     this.resume();
     if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
 
     const ctx = this.ctx;
     const now = ctx.currentTime;
+    const category = options.soundCategory || 'flying';
 
     // Handle Deactivation
     if (!options.isActive || options.volumeMultiplier <= 0.01) {
@@ -411,7 +501,6 @@ class AudioEngine {
     if (!buzzer) {
       const gain = ctx.createGain();
       
-      // Let's add stereo panning if supported
       let panner: StereoPannerNode | null = null;
       try {
         if (ctx.createStereoPanner) {
@@ -428,53 +517,47 @@ class AudioEngine {
 
       gain.gain.setValueAtTime(0, now);
 
-      let source: AudioBufferSourceNode | undefined;
-      let osc1: OscillatorNode | undefined;
-      let osc2: OscillatorNode | undefined;
-      let soundIndex = -1;
+      buzzer = { gain, panner, soundIndex: -1, category };
+      this.flyBuzzers.set(flyId, buzzer);
 
-      if (this.flyBuffers.length > 0) {
-        // Pick a sound index based on hashing the flyId so the fly keeps the same sound throughout its lifetime
-        let hash = 0;
-        for (let i = 0; i < flyId.length; i++) {
-          hash = flyId.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        soundIndex = Math.abs(hash) % this.flyBuffers.length;
-
-        source = ctx.createBufferSource();
-        source.buffer = this.flyBuffers[soundIndex];
-        source.loop = true;
-        source.connect(gain);
-        const randomOffset = Math.random() * source.buffer.duration;
-        source.start(now, randomOffset);
+      const categoryBuffers = this.getBuffersForCategory(category);
+      if (categoryBuffers.length > 0) {
+        this.startSourceForBuzzer(flyId, buzzer, options.pitch);
       } else {
-        // Fallback to procedural synthesis if no files loaded
-        osc1 = ctx.createOscillator();
-        osc2 = ctx.createOscillator();
-
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
         osc1.type = 'sawtooth';
         osc1.frequency.setValueAtTime(options.pitch, now);
-        
         osc2.type = 'triangle';
         osc2.frequency.setValueAtTime(options.pitch * 1.5 + 4, now);
-
         osc1.connect(gain);
         osc2.connect(gain);
-
         osc1.start(now);
         osc2.start(now);
+        buzzer.osc1 = osc1;
+        buzzer.osc2 = osc2;
       }
-
-      buzzer = { source, osc1, osc2, gain, panner, soundIndex };
-      this.flyBuzzers.set(flyId, buzzer);
+    } else if (buzzer.category !== category) {
+      // Smoothly transition buffer when changing fly state category
+      if (buzzer.source) {
+        try {
+          buzzer.source.onended = null;
+          buzzer.source.stop();
+          buzzer.source.disconnect();
+        } catch (e) {}
+      }
+      buzzer.category = category;
+      const categoryBuffers = this.getBuffersForCategory(category);
+      if (categoryBuffers.length > 0) {
+        this.startSourceForBuzzer(flyId, buzzer, options.pitch);
+      }
     }
 
-    // Dynamic Updates - cap it so it isn't deafening
+    // Dynamic Updates - cap volume so it isn't deafening
     const targetVolume = Math.min(options.volumeMultiplier * 0.18, 0.28);
     buzzer.gain.gain.setTargetAtTime(targetVolume, now, 0.1);
     
     if (buzzer.source) {
-      // Map fly pitch to playback rate (e.g. 100 Hz = 1.0 playback rate)
       const targetRate = options.pitch / 100;
       buzzer.source.playbackRate.setTargetAtTime(targetRate, now, 0.15);
     } else {
@@ -484,7 +567,6 @@ class AudioEngine {
       }
     }
 
-    // Smoothly interpolate panning
     if (buzzer.panner) {
       const clampedPan = Math.max(-1, Math.min(1, options.panX));
       buzzer.panner.pan.setTargetAtTime(clampedPan, now, 0.15);
@@ -646,6 +728,39 @@ class AudioEngine {
     }, 600);
   }
 
+  getNinjaClipCount(): number {
+    return this.ninjaBuffers.length;
+  }
+
+  playNinjaClipForLevel(level: number, onEnded: () => void) {
+    this.resume();
+    this.stopFlybyNarration();
+
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) {
+      onEnded();
+      return;
+    }
+
+    const bufferIndex = level - 1;
+    if (bufferIndex >= 0 && bufferIndex < this.ninjaBuffers.length) {
+      try {
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.ninjaBuffers[bufferIndex];
+        source.connect(this.sfxGain);
+        source.onended = () => {
+          onEnded();
+        };
+        source.start(0);
+        return;
+      } catch (e) {
+        console.warn(`Failed playing ninja buffer for level ${level}:`, e);
+      }
+    }
+
+    // Fallback to flyBy_sound_1 narration if buffer index not present
+    this.playFlybyNarration(onEnded);
+  }
+
   // Play flyby narration sound
   playFlybyNarration(onEnded: () => void) {
     this.resume();
@@ -676,7 +791,6 @@ class AudioEngine {
       });
     } catch (e) {
       console.warn("MediaElementSource failed (could be already created):", e);
-      // Fallback: play it directly without Web Audio graph if graph creation fails
       const audio = new Audio(soundUrl);
       this.activeFlybyAudio = audio;
       audio.play().catch(onEnded);

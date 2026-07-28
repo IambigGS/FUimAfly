@@ -67,6 +67,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const hasZoomedThisSession = useRef(false);
   const isZoomActiveRef = useRef(false);
   const hasSpawnedNinjaThisSession = useRef(false);
+  const ninjaSpawnedLevelsRef = useRef<Set<number>>(new Set());
+
+  const autoCaptureRef = useRef<{
+    active: boolean;
+    phase: 'approaching' | 'grabbing' | 'carrying' | 'releasing' | 'exiting';
+    flyId: string;
+    startTime: number;
+    startPos: { x: number; y: number };
+    targetPos: { x: number; y: number };
+  } | null>(null);
   
   // Game Stats Tracking
   const statsRef = useRef<GameStats>({
@@ -354,7 +364,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         timeScaleRef.current = 1.0;
       }, 21000);
 
-      audio.playFlybyNarration(() => {
+      audio.playNinjaClipForLevel(currentLevelRef.current, () => {
         clearTimeout(timeoutId);
         setFlyCatchable(newFly.id, true);
         timeScaleRef.current = 1.0;
@@ -946,18 +956,96 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 2. Interpolate Chopsticks position (smooth trailing physics)
       const mouse = mouseRef.current;
 
-      // Mobile / Touch Joystick Movement
-      if (isMobileOrTouchDevice() && joystickRef.current.active) {
-        const dx = joystickRef.current.thumbX - joystickRef.current.baseX;
-        const dy = joystickRef.current.thumbY - joystickRef.current.baseY;
-        mouse.x += dx * 0.22 * timeScaleRef.current;
-        mouse.y += dy * 0.22 * timeScaleRef.current;
-        mouse.x = Math.max(0, Math.min(canvas.width, mouse.x));
-        mouse.y = Math.max(0, Math.min(canvas.height, mouse.y));
-      }
+      if (isMobileOrTouchDevice() && autoCaptureRef.current?.active) {
+        const ac = autoCaptureRef.current;
+        const now = Date.now();
+        const elapsed = now - ac.startTime;
+        const targetFly = fliesRef.current.find(f => f.id === ac.flyId);
 
-      cTip.x += (mouse.x - cTip.x) * 0.45 * timeScaleRef.current;
-      cTip.y += (mouse.y - cTip.y) * 0.45 * timeScaleRef.current;
+        if (ac.phase === 'approaching') {
+          if (targetFly) {
+            ac.targetPos = { x: targetFly.x, y: targetFly.y };
+          }
+          const t = Math.min(1, elapsed / 300);
+          const easeT = t * t * (3 - 2 * t);
+          cTip.x = ac.startPos.x + (ac.targetPos.x - ac.startPos.x) * easeT;
+          cTip.y = ac.startPos.y + (ac.targetPos.y - ac.startPos.y) * easeT;
+          mouse.isPinching = false;
+
+          if (elapsed >= 300) {
+            ac.phase = 'grabbing';
+            ac.startTime = now;
+          }
+        } else if (ac.phase === 'grabbing') {
+          mouse.isPinching = true;
+          cTip.x = ac.targetPos.x;
+          cTip.y = ac.targetPos.y;
+
+          if (targetFly && !targetFly.isCaught) {
+            targetFly.isCaught = true;
+            targetFly.state = 'flying';
+            targetFly.caughtTime = now;
+            audio.playClack();
+            createCaptureParticles(targetFly.x, targetFly.y, targetFly.color);
+            addFloatingText(targetFly.x, targetFly.y, "Captured! 🥢", "#10b981");
+
+            // Unblock food if fly was landed
+            if (targetFly.landingTargetId) {
+              const d = dumplingsRef.current.find(item => item.id === targetFly.landingTargetId);
+              if (d) d.isBlockedByFly = false;
+              if (teaRef.current.flyId === targetFly.id) {
+                teaRef.current.isBlockedByFly = false;
+                teaRef.current.flyId = undefined;
+              }
+            }
+          }
+
+          if (elapsed >= 150) {
+            ac.phase = 'carrying';
+            ac.startTime = now;
+            ac.startPos = { x: cTip.x, y: cTip.y };
+            ac.targetPos = { x: releaseWindowRef.current.x, y: releaseWindowRef.current.y };
+          }
+        } else if (ac.phase === 'carrying') {
+          const t = Math.min(1, elapsed / 400);
+          const easeT = t * t * (3 - 2 * t);
+          cTip.x = ac.startPos.x + (ac.targetPos.x - ac.startPos.x) * easeT;
+          cTip.y = ac.startPos.y + (ac.targetPos.y - ac.startPos.y) * easeT;
+          mouse.isPinching = true;
+
+          if (targetFly) {
+            targetFly.x = cTip.x;
+            targetFly.y = cTip.y;
+          }
+
+          if (elapsed >= 400) {
+            ac.phase = 'releasing';
+            ac.startTime = now;
+          }
+        } else if (ac.phase === 'releasing') {
+          mouse.isPinching = false;
+          if (targetFly && targetFly.isCaught) {
+            releaseFlyToFreedom(targetFly);
+          }
+          if (elapsed >= 150) {
+            ac.phase = 'exiting';
+            ac.startTime = now;
+            ac.startPos = { x: cTip.x, y: cTip.y };
+            ac.targetPos = { x: canvas.width / 2, y: canvas.height + 100 };
+          }
+        } else if (ac.phase === 'exiting') {
+          const t = Math.min(1, elapsed / 200);
+          cTip.x = ac.startPos.x + (ac.targetPos.x - ac.startPos.x) * t;
+          cTip.y = ac.startPos.y + (ac.targetPos.y - ac.startPos.y) * t;
+
+          if (elapsed >= 200) {
+            autoCaptureRef.current = null;
+          }
+        }
+      } else {
+        cTip.x += (mouse.x - cTip.x) * 0.45 * timeScaleRef.current;
+        cTip.y += (mouse.y - cTip.y) * 0.45 * timeScaleRef.current;
+      }
 
       // Animate clamp separation gap
       const targetSep = mouse.isPinching ? 1.5 : 24;
@@ -1136,6 +1224,62 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           fly.state = 'flying';
         }
 
+        // Landing target steering and touchdown logic
+        if (fly.landingTargetId && fly.state !== 'escaping' && !fly.isCaught) {
+          let targetPos: { x: number; y: number } | null = null;
+          if (fly.landingTargetId === 'tea') {
+            targetPos = { x: teaRef.current.x, y: teaRef.current.y - 12 };
+          } else {
+            const d = dumplingsRef.current.find(item => item.id === fly.landingTargetId);
+            if (d && !d.isEaten) {
+              targetPos = { x: d.x, y: d.y };
+            }
+          }
+
+          if (targetPos) {
+            const distToTarget = getDistance(fly.x, fly.y, targetPos.x, targetPos.y);
+            if (distToTarget < 22) {
+              // Touchdown on item
+              fly.state = 'resting';
+              fly.vx *= 0.5;
+              fly.vy *= 0.5;
+              if (fly.landingTargetId === 'tea') {
+                teaRef.current.isBlockedByFly = true;
+                fly.landingType = 'tea';
+              } else {
+                const d = dumplingsRef.current.find(item => item.id === fly.landingTargetId);
+                if (d) {
+                  d.isBlockedByFly = true;
+                  fly.landingType = 'dumpling';
+                }
+              }
+            } else if (fly.state !== 'resting') {
+              // Gently steer towards landing spot
+              const dx = targetPos.x - fly.x;
+              const dy = targetPos.y - fly.y;
+              const len = Math.sqrt(dx * dx + dy * dy) || 1;
+              fly.vx += (dx / len) * 0.14 * speedMultiplier;
+              fly.vy += (dy / len) * 0.14 * speedMultiplier;
+            }
+          }
+        }
+
+        // If fly is escaping, unblock any item it was landed on
+        if (fly.state === 'escaping' && fly.landingTargetId) {
+          if (fly.landingTargetId === 'tea') {
+            teaRef.current.isBlockedByFly = false;
+            teaRef.current.flyId = undefined;
+          } else {
+            const d = dumplingsRef.current.find(item => item.id === fly.landingTargetId);
+            if (d) {
+              d.isBlockedByFly = false;
+              d.flyId = undefined;
+            }
+          }
+          fly.landingTargetId = undefined;
+          fly.landingType = undefined;
+        }
+
         // Buzz flight jitter mechanics
         if (fly.state === 'flying') {
           if (Math.random() < fly.twitchiness) {
@@ -1297,22 +1441,36 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const activeFlyIds = new Set<string>();
 
         flies.forEach((fly) => {
-          if (fly.state === 'releasing' || fly.isCaught) {
+          if (fly.state === 'releasing') {
             audio.stopFlyBuzz(fly.id);
             return;
+          }
+
+          let soundCategory: 'flying' | 'landed_drink' | 'landed_dumpling' | 'captured' = 'flying';
+          if (fly.isCaught) {
+            soundCategory = 'captured';
+          } else if (fly.state === 'resting') {
+            if (fly.landingType === 'tea') soundCategory = 'landed_drink';
+            else if (fly.landingType === 'dumpling') soundCategory = 'landed_dumpling';
+          } else if (fly.state === 'flying' || fly.state === 'escaping' || fly.state === 'hovering') {
+            soundCategory = 'flying';
           }
 
           const dist = getDistance(fly.x, fly.y, cTip.x, cTip.y);
           activeFlyIds.add(fly.id);
 
-          // Volume scale is intense when right under chopsticks, fades to zero by 320px
-          const maxHearingRadius = 320;
           let volumeScale = 0;
-          if (dist < maxHearingRadius) {
-            volumeScale = 1.0 - (dist / maxHearingRadius);
-            // Modulate volume if escaping or flying
-            if (fly.state === 'escaping') {
-              volumeScale *= 1.35;
+          if (fly.isCaught) {
+            volumeScale = 0.9;
+          } else if (fly.state === 'resting') {
+            volumeScale = 0.8;
+          } else {
+            const maxHearingRadius = 320;
+            if (dist < maxHearingRadius) {
+              volumeScale = 1.0 - (dist / maxHearingRadius);
+              if (fly.state === 'escaping') {
+                volumeScale *= 1.35;
+              }
             }
           }
 
@@ -1323,6 +1481,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             volumeMultiplier: volumeScale,
             panX: screenPanX,
             isActive: true,
+            soundCategory,
           });
         });
 
@@ -1369,74 +1528,77 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.restore();
 
       // 7. Draw Chopsticks
-      ctx.save();
-      // Draw hand-held vector chopsticks aiming down-left towards cTip
-      const A1 = -Math.PI / 5.2; // -34 degrees base angle pointing top-right
-      const len = selectedChopstick.length;
-      
-      // Pivot offset where fingers clamp
-      const separationY = cTip.separation;
+      const shouldDrawChopsticks = !isMobileOrTouchDevice() || (autoCaptureRef.current && autoCaptureRef.current.active);
+      if (shouldDrawChopsticks) {
+        ctx.save();
+        // Draw hand-held vector chopsticks aiming down-left towards cTip
+        const A1 = -Math.PI / 5.2; // -34 degrees base angle pointing top-right
+        const len = selectedChopstick.length;
+        
+        // Pivot offset where fingers clamp
+        const separationY = cTip.separation;
 
-      // Draw shadow first
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.06)';
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetX = -8;
-      ctx.shadowOffsetY = 12;
+        // Draw shadow first
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.06)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = -8;
+        ctx.shadowOffsetY = 12;
 
-      // Stick 1: Fixed/Static Lower Stick
-      ctx.save();
-      ctx.translate(cTip.x, cTip.y);
-      ctx.rotate(A1);
+        // Stick 1: Fixed/Static Lower Stick
+        ctx.save();
+        ctx.translate(cTip.x, cTip.y);
+        ctx.rotate(A1);
 
-      // Draw stick polygon from tip (0, 0) to handle (len, 0)
-      ctx.fillStyle = selectedChopstick.color1;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(len, -selectedChopstick.gripWidth / 2);
-      ctx.lineTo(len, selectedChopstick.gripWidth / 2);
-      ctx.closePath();
-      ctx.fill();
+        // Draw stick polygon from tip (0, 0) to handle (len, 0)
+        ctx.fillStyle = selectedChopstick.color1;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(len, -selectedChopstick.gripWidth / 2);
+        ctx.lineTo(len, selectedChopstick.gripWidth / 2);
+        ctx.closePath();
+        ctx.fill();
 
-      // Golden band/Cap accent on Stick 1
-      ctx.fillStyle = selectedChopstick.color2;
-      ctx.fillRect(len - 45, -selectedChopstick.gripWidth / 2, 8, selectedChopstick.gripWidth);
-      ctx.fillRect(len - 15, -selectedChopstick.gripWidth / 2, 15, selectedChopstick.gripWidth);
-      ctx.restore();
+        // Golden band/Cap accent on Stick 1
+        ctx.fillStyle = selectedChopstick.color2;
+        ctx.fillRect(len - 45, -selectedChopstick.gripWidth / 2, 8, selectedChopstick.gripWidth);
+        ctx.fillRect(len - 15, -selectedChopstick.gripWidth / 2, 15, selectedChopstick.gripWidth);
+        ctx.restore();
 
-      // Stick 2: Pivoting Upper Stick
-      ctx.save();
-      // Translate slightly higher up-left based on separation gap
-      const offsetSeparationX = -separationY * Math.sin(A1);
-      const offsetSeparationY = separationY * Math.cos(A1);
+        // Stick 2: Pivoting Upper Stick
+        ctx.save();
+        // Translate slightly higher up-left based on separation gap
+        const offsetSeparationX = -separationY * Math.sin(A1);
+        const offsetSeparationY = separationY * Math.cos(A1);
 
-      ctx.translate(cTip.x + offsetSeparationX, cTip.y + offsetSeparationY);
-      // Pivoting rotation meets at tip (separation = 0)
-      const stick2Angle = A1 + (separationY * 0.0055);
-      ctx.rotate(stick2Angle);
+        ctx.translate(cTip.x + offsetSeparationX, cTip.y + offsetSeparationY);
+        // Pivoting rotation meets at tip (separation = 0)
+        const stick2Angle = A1 + (separationY * 0.0055);
+        ctx.rotate(stick2Angle);
 
-      ctx.fillStyle = selectedChopstick.color1;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(len, -selectedChopstick.gripWidth / 2);
-      ctx.lineTo(len, selectedChopstick.gripWidth / 2);
-      ctx.closePath();
-      ctx.fill();
+        ctx.fillStyle = selectedChopstick.color1;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(len, -selectedChopstick.gripWidth / 2);
+        ctx.lineTo(len, selectedChopstick.gripWidth / 2);
+        ctx.closePath();
+        ctx.fill();
 
-      // Golden band/Cap accent on Stick 2
-      ctx.fillStyle = selectedChopstick.color2;
-      ctx.fillRect(len - 45, -selectedChopstick.gripWidth / 2, 8, selectedChopstick.gripWidth);
-      ctx.fillRect(len - 15, -selectedChopstick.gripWidth / 2, 15, selectedChopstick.gripWidth);
+        // Golden band/Cap accent on Stick 2
+        ctx.fillStyle = selectedChopstick.color2;
+        ctx.fillRect(len - 45, -selectedChopstick.gripWidth / 2, 8, selectedChopstick.gripWidth);
+        ctx.fillRect(len - 15, -selectedChopstick.gripWidth / 2, 15, selectedChopstick.gripWidth);
 
-      // Draw metallic glow if custom style supports sparkles
-      if (selectedChopstick.hasSparkles && Math.random() < 0.2) {
-        createSparkles(cTip.x, cTip.y, selectedChopstick.sparkleColor);
+        // Draw metallic glow if custom style supports sparkles
+        if (selectedChopstick.hasSparkles && Math.random() < 0.2) {
+          createSparkles(cTip.x, cTip.y, selectedChopstick.sparkleColor);
+        }
+
+        ctx.restore();
+        ctx.restore(); // Shadow clear
       }
 
-      ctx.restore();
-      ctx.restore(); // Shadow clear
-
       // 8. Draw Aiming Helper Guides (Glowing target reticle)
-      if (showHelper) {
+      if (showHelper && !isMobileOrTouchDevice()) {
         ctx.save();
         ctx.strokeStyle = 'rgba(140, 116, 80, 0.28)';
         ctx.lineWidth = 1;
@@ -1824,66 +1986,59 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   };
 
-  // Touch handlers for mobile players
+  // Touch handlers for mobile players (Tap-to-Catch)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!isPlaying || e.touches.length === 0) return;
-    
-    if (isMobileOrTouchDevice()) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const halfWidth = window.innerWidth / 2;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
 
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (touch.clientX < halfWidth && !joystickRef.current.active) {
-          joystickRef.current = {
+    // Visual tap ripple particle feedback for every tap
+    createSparkles(touchX, touchY, 'rgba(255, 255, 255, 0.95)', 8);
+
+    if (isMobileOrTouchDevice()) {
+      // If chopsticks are currently carrying out an auto capture sequence, block tap
+      if (autoCaptureRef.current?.active) return;
+
+      // Search for flies near tap coordinate (1.5x hit radius for finger tap)
+      const hitRadius = getDifficultySettings().hitRadius * 1.5;
+      const nearbyFly = fliesRef.current.find((f) => {
+        if (f.state === 'releasing' || f.isCaught) return false;
+        return getDistance(touchX, touchY, f.x, f.y) <= hitRadius;
+      });
+
+      if (nearbyFly) {
+        if (nearbyFly.type === 'ninja' && nearbyFly.isCatchable === false) {
+          audio.playClack();
+          addFloatingText(touchX, touchY, "Too Fast! ⚡", "#a855f7");
+        } else {
+          autoCaptureRef.current = {
             active: true,
-            id: touch.identifier,
-            baseX: touch.clientX - rect.left,
-            baseY: touch.clientY - rect.top,
-            thumbX: touch.clientX - rect.left,
-            thumbY: touch.clientY - rect.top,
+            phase: 'approaching',
+            flyId: nearbyFly.id,
+            startTime: Date.now(),
+            startPos: { x: canvas.width / 2, y: canvas.height + 80 },
+            targetPos: { x: nearbyFly.x, y: nearbyFly.y },
           };
-        } else if (touch.clientX >= halfWidth && !actionButtonRef.current.active) {
-          actionButtonRef.current = { active: true, id: touch.identifier };
-          performPinchStrike(); // Strike at current mouse location
         }
+      } else {
+        audio.playClack();
+        addFloatingText(touchX, touchY, "Miss!", "rgba(200, 180, 140, 0.7)");
       }
     } else {
-      const touch = e.touches[0];
       performPinchStrike(touch.clientX, touch.clientY);
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isPlaying || e.touches.length === 0) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-
-    if (isMobileOrTouchDevice()) {
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (touch.identifier === joystickRef.current.id) {
-          const tx = touch.clientX - rect.left;
-          const ty = touch.clientY - rect.top;
-          
-          const dx = tx - joystickRef.current.baseX;
-          const dy = ty - joystickRef.current.baseY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const maxRadius = 45;
-          
-          if (dist > maxRadius) {
-            joystickRef.current.thumbX = joystickRef.current.baseX + (dx / dist) * maxRadius;
-            joystickRef.current.thumbY = joystickRef.current.baseY + (dy / dist) * maxRadius;
-          } else {
-            joystickRef.current.thumbX = tx;
-            joystickRef.current.thumbY = ty;
-          }
-        }
-      }
-    } else {
+    if (!isMobileOrTouchDevice()) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
       const touch = e.touches[0];
       mouseRef.current.x = touch.clientX - rect.left;
       mouseRef.current.y = touch.clientY - rect.top;
@@ -1892,18 +2047,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isPlaying) return;
-    if (isMobileOrTouchDevice()) {
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (touch.identifier === joystickRef.current.id) {
-          joystickRef.current.active = false;
-        }
-        if (touch.identifier === actionButtonRef.current.id) {
-          actionButtonRef.current.active = false;
-          handleReleasePinch();
-        }
-      }
-    } else {
+    if (!isMobileOrTouchDevice()) {
       handleReleasePinch();
     }
   };
@@ -2002,20 +2146,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // Target flies to land on unblocked Dumplings or Soda Rim
-      const unlandedFlies = fliesRef.current.filter(f => !f.isCaught && f.state !== 'resting' && f.state !== 'releasing');
+      const unlandedFlies = fliesRef.current.filter(f => !f.isCaught && f.state !== 'resting' && f.state !== 'releasing' && !f.landingTargetId);
       if (unlandedFlies.length > 0) {
         const targetFly = unlandedFlies[Math.floor(Math.random() * unlandedFlies.length)];
         
         // 40% chance to target Soda Rim, 60% chance to target Dumpling
-        if (Math.random() < 0.4 && !teaRef.current.isBlockedByFly) {
-          teaRef.current.isBlockedByFly = true;
+        if (Math.random() < 0.4 && !teaRef.current.isBlockedByFly && !teaRef.current.flyId) {
           teaRef.current.flyId = targetFly.id;
           targetFly.landingTargetId = 'tea';
         } else {
-          const unblockedDumplings = dumplingsRef.current.filter(d => !d.isEaten && !d.isBlockedByFly);
+          const unblockedDumplings = dumplingsRef.current.filter(d => !d.isEaten && !d.isBlockedByFly && !d.flyId);
           if (unblockedDumplings.length > 0) {
             const targetDumpling = unblockedDumplings[Math.floor(Math.random() * unblockedDumplings.length)];
-            targetDumpling.isBlockedByFly = true;
             targetDumpling.flyId = targetFly.id;
             targetDumpling.landingTargetId = targetDumpling.id;
           }
