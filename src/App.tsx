@@ -84,13 +84,17 @@ export default function App() {
     }
   }, []);
 
-  // Defensive Telegram Mini App Initialization
+  // Defensive Telegram Mini App Initialization & Viewport Listener
   useEffect(() => {
     try {
       const tg = window.Telegram?.WebApp;
       if (tg) {
         tg.ready();
+        
+        // 1. Expand to max viewport height
         tg.expand();
+
+        // 2. Request native Telegram Fullscreen (if supported by client)
         if (typeof tg.requestFullscreen === 'function') {
           try {
             tg.requestFullscreen();
@@ -98,9 +102,28 @@ export default function App() {
             console.warn('requestFullscreen on Telegram load:', e);
           }
         }
+
+        // 3. Enable viewport change listener
+        tg.onEvent('viewportChanged', () => {
+          console.log(`Telegram viewportChanged: height=${tg.viewportHeight}, isExpanded=${tg.isExpanded}`);
+          if (typeof (window as any).onResize === 'function') {
+            (window as any).onResize();
+          }
+          window.dispatchEvent(new Event('resize'));
+        });
+
         if (tg.setHeaderColor) tg.setHeaderColor('#1a1a1a');
         if (tg.setBackgroundColor) tg.setBackgroundColor('#000000');
-        console.log('Telegram Mini App initialized cleanly on platform:', tg.platform);
+
+        // 4. Diagnostic Console Logging
+        console.log('--- Telegram WebApp SDK Status ---');
+        console.log('Telegram WebApp Status: Initialized');
+        console.log(`Platform Detected: ${tg.platform}`);
+        console.log(`Viewport Height: ${tg.viewportHeight}`);
+        console.log(`Is Expanded: ${tg.isExpanded}`);
+      } else {
+        console.log('--- Telegram WebApp SDK Status ---');
+        console.log('Telegram WebApp Status: Standalone Browser Mode (No Telegram WebApp SDK context)');
       }
     } catch (e) {
       console.warn('Telegram WebApp initialization skipped:', e);

@@ -529,6 +529,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
     };
 
+    (window as any).onResize = handleResize;
     window.addEventListener('resize', handleResize);
     handleResize();
 
