@@ -23,6 +23,7 @@ interface GameCanvasProps {
   showHelper: boolean;
   soundEnabled: boolean;
   layoutMode?: 'original' | 'triangular';
+  simulateTouch?: boolean;
   onGameEnd: (stats: GameStats) => void;
   onStatsUpdate: (stats: GameStats) => void;
 }
@@ -35,9 +36,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   showHelper,
   soundEnabled,
   layoutMode = 'original',
+  simulateTouch = false,
   onGameEnd,
   onStatsUpdate,
 }) => {
+  const isTouchMode = () => simulateTouch || isMobileOrTouchDevice();
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -968,7 +971,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 2. Interpolate Chopsticks position (smooth trailing physics)
       const mouse = mouseRef.current;
 
-      if (isMobileOrTouchDevice() && autoCaptureRef.current?.active) {
+      if (isTouchMode() && autoCaptureRef.current?.active) {
         const ac = autoCaptureRef.current;
         const now = Date.now();
         const elapsed = now - ac.startTime;
@@ -1540,7 +1543,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.restore();
 
       // 7. Draw Chopsticks
-      const shouldDrawChopsticks = !isMobileOrTouchDevice() || (autoCaptureRef.current && autoCaptureRef.current.active);
+      const shouldDrawChopsticks = !isTouchMode() || (autoCaptureRef.current && autoCaptureRef.current.active);
       if (shouldDrawChopsticks) {
         ctx.save();
         // Draw hand-held vector chopsticks aiming down-left towards cTip
@@ -1610,7 +1613,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // 8. Draw Aiming Helper Guides (Glowing target reticle)
-      if (showHelper && !isMobileOrTouchDevice()) {
+      if (showHelper && !isTouchMode()) {
         ctx.save();
         ctx.strokeStyle = 'rgba(140, 116, 80, 0.28)';
         ctx.lineWidth = 1;
@@ -1648,8 +1651,41 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       ctx.restore(); // Balance the camera save
       
+      // Draw Simulated Touch Finger Indicator on PC
+      if (simulateTouch) {
+        ctx.save();
+        const mx = mouseRef.current.x;
+        const my = mouseRef.current.y;
+        
+        // Outer dashed touch ring
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(mx, my, 22, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Inner touch circle target
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.strokeStyle = 'rgba(26, 26, 26, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(mx, my, 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Small center dot
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.arc(mx, my, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      }
+
       // 9. Draw Mobile Virtual Joystick and Action Hint (Outside camera transform so it stays fixed to screen)
-      if (isMobileOrTouchDevice()) {
+      if (isTouchMode()) {
         if (joystickRef.current.active) {
           ctx.beginPath();
           ctx.arc(joystickRef.current.baseX, joystickRef.current.baseY, 45, 0, Math.PI * 2);
@@ -1863,6 +1899,60 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     mouseRef.current.x = mx;
     mouseRef.current.y = my;
 
+    if (isTouchMode()) {
+      createSparkles(mx, my, 'rgba(255, 255, 255, 0.95)', 8);
+
+      // 1. Check if touching a Dumpling
+      const dumplings = dumplingsRef.current;
+      for (let i = 0; i < dumplings.length; i++) {
+        const d = dumplings[i];
+        if (!d.isEaten && getDistance(mx, my, d.x, d.y) <= 40) {
+          if (!d.isBlockedByFly) {
+            dragItemRef.current = { type: 'dumpling', id: d.id, index: i, startX: mx, startY: my };
+            return;
+          }
+        }
+      }
+
+      // 2. Check if touching Soda Tumbler/Tea
+      const tea = teaRef.current;
+      if (getDistance(mx, my, tea.x, tea.y) <= 55) {
+        if (!tea.isBlockedByFly) {
+          dragItemRef.current = { type: 'tea', startX: mx, startY: my };
+          return;
+        }
+      }
+
+      // 3. Otherwise try to catch a fly
+      if (autoCaptureRef.current?.active) return;
+
+      const hitRadius = getDifficultySettings().hitRadius * 1.5;
+      const nearbyFly = fliesRef.current.find((f) => {
+        if (f.state === 'releasing' || f.isCaught) return false;
+        return getDistance(mx, my, f.x, f.y) <= hitRadius;
+      });
+
+      if (nearbyFly) {
+        if (nearbyFly.type === 'ninja' && nearbyFly.isCatchable === false) {
+          audio.playClack();
+          addFloatingText(mx, my, "Too Fast! ⚡", "#a855f7");
+        } else {
+          autoCaptureRef.current = {
+            active: true,
+            phase: 'approaching',
+            flyId: nearbyFly.id,
+            startTime: Date.now(),
+            startPos: { x: canvas.width / 2, y: canvas.height + 80 },
+            targetPos: { x: nearbyFly.x, y: nearbyFly.y },
+          };
+        }
+      } else {
+        audio.playClack();
+        addFloatingText(mx, my, "Miss!", "rgba(200, 180, 140, 0.7)");
+      }
+      return;
+    }
+
     // 1. Check if clicking on a Dumpling
     const dumplings = dumplingsRef.current;
     for (let i = 0; i < dumplings.length; i++) {
@@ -1918,6 +2008,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const my = e.clientY - rect.top;
     mouseRef.current.x = mx;
     mouseRef.current.y = my;
+
+    if (isTouchMode()) {
+      if (dragItemRef.current) {
+        const mouth = mouthRef.current;
+        const dist = getDistance(mx, my, mouth.x, mouth.y);
+        mouth.isOpen = dist <= mouth.radius + 25;
+      }
+      return;
+    }
 
     // Open mouth visual feedback when dragging near mouth
     if (dragItemRef.current) {
@@ -1999,7 +2098,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   };
 
-  const handleMouseUp = (e: React.MouseEvent) => handleDropOrRelease();
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (isTouchMode()) {
+      if (dragItemRef.current) {
+        handleDropOrRelease();
+      }
+      return;
+    }
+    handleDropOrRelease();
+  };
 
   // Touch handlers for mobile players (Tap-to-Catch)
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -2014,7 +2121,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     // Visual tap ripple particle feedback for every tap
     createSparkles(touchX, touchY, 'rgba(255, 255, 255, 0.95)', 8);
 
-    if (isMobileOrTouchDevice()) {
+    if (isTouchMode()) {
       // 1. Check if touching a Dumpling
       const dumplings = dumplingsRef.current;
       for (let i = 0; i < dumplings.length; i++) {
@@ -2083,7 +2190,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const mx = touch.clientX - rect.left;
     const my = touch.clientY - rect.top;
 
-    if (!isMobileOrTouchDevice()) {
+    if (!isTouchMode()) {
       mouseRef.current.x = mx;
       mouseRef.current.y = my;
     } else {
@@ -2101,7 +2208,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (!isPlaying) return;
-    if (!isMobileOrTouchDevice()) {
+    if (!isTouchMode()) {
       handleReleasePinch();
     } else {
       if (dragItemRef.current) {
@@ -2112,7 +2219,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // Desktop Keyboard Controls (WASD / Arrow Keys for movement, Space for pinch/strike)
   useEffect(() => {
-    if (!isPlaying || isMobileOrTouchDevice()) return;
+    if (!isPlaying || isTouchMode()) return;
 
     const keysPressed: Record<string, boolean> = {};
 
