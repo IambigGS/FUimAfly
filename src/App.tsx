@@ -74,6 +74,7 @@ export default function App() {
 
   // A/B Layout Testing Mode
   const [layoutMode, setLayoutMode] = useState<'original' | 'triangular'>('triangular');
+  const [simulateTouch, setSimulateTouch] = useState<boolean>(false);
 
   const handleViewportModeChange = (mode: 'desktop' | 'telegram_pc') => {
     setViewportMode(mode);
@@ -288,10 +289,12 @@ export default function App() {
         CHOPSTICK MASTER
       </div>
 
-      {/* Red Calligraphy Seal Stamp */}
-      <div className={`absolute ${viewportMode === 'telegram_pc' ? 'top-3 left-3 w-8 h-8 text-sm' : 'top-6 left-6 w-12 h-12 text-xl'} z-20 border-2 border-brand-red border-dashed rounded-none flex items-center justify-center font-serif font-extrabold text-brand-red rotate-[-12deg] select-none pointer-events-none shadow-xs`}>
-        <span>禅</span>
-      </div>
+      {/* Red Calligraphy Seal Stamp (Positioned relative to header in Telegram PC mode) */}
+      {viewportMode !== 'telegram_pc' && (
+        <div className="absolute top-6 left-6 w-12 h-12 text-xl z-20 border-2 border-brand-red border-dashed rounded-none flex items-center justify-center font-serif font-extrabold text-brand-red rotate-[-12deg] select-none pointer-events-none shadow-xs">
+          <span>禅</span>
+        </div>
+      )}
 
       {/* 2. Audio Ambiance toggle & Viewport Quick-toggle (Only shown in Full Desktop mode when in menu) */}
       {viewportMode === 'desktop' && gameState === 'menu' && (
@@ -338,17 +341,22 @@ export default function App() {
             className="flex-1 flex flex-col items-center justify-start md:justify-center pt-8 pb-12 px-4 md:p-8 z-10 select-none overflow-y-auto"
           >
             {/* Title Calligraphy Frame */}
-            <div className={`text-center max-w-xl ${viewportMode === 'telegram_pc' ? 'mb-3 pt-2' : 'mb-6 md:mb-10'} z-10`}>
-              <span className="text-xs uppercase tracking-widest text-brand-red font-mono font-bold block mb-1">
+            <div className={`text-center max-w-xl ${viewportMode === 'telegram_pc' ? 'mb-2 pt-1' : 'mb-6 md:mb-10'} z-10 relative`}>
+              {viewportMode === 'telegram_pc' && (
+                <div className="absolute -top-1 left-0 w-7 h-7 text-xs border border-brand-red border-dashed flex items-center justify-center font-serif font-extrabold text-brand-red rotate-[-12deg] select-none pointer-events-none">
+                  <span>禅</span>
+                </div>
+              )}
+              <span className="text-[10px] sm:text-xs uppercase tracking-widest text-brand-red font-mono font-bold block mb-0.5">
                 🥢 Zen Training Dojo 🥢
               </span>
-              <h1 className={`${viewportMode === 'telegram_pc' ? 'text-2xl' : 'text-4xl md:text-5xl'} font-serif font-black text-brand-charcoal tracking-tight leading-none`}>
+              <h1 className={`${viewportMode === 'telegram_pc' ? 'text-xl' : 'text-4xl md:text-5xl'} font-serif font-black text-brand-charcoal tracking-tight leading-none`}>
                 Chopstick Fly Catcher
               </h1>
-              <p className="text-[11px] md:text-sm text-brand-charcoal/80 mt-1.5 max-w-md mx-auto italic font-serif">
+              <p className={`${viewportMode === 'telegram_pc' ? 'text-[10px]' : 'text-[11px] md:text-sm'} text-brand-charcoal/80 mt-1 max-w-md mx-auto italic font-serif`}>
                 "Concentration is the path to speed. Control your chopsticks, control your destiny."
               </p>
-              <div className="w-24 h-1 bg-brand-charcoal mx-auto mt-2.5"></div>
+              <div className={`w-16 h-0.5 bg-brand-charcoal mx-auto ${viewportMode === 'telegram_pc' ? 'mt-1.5' : 'mt-2.5'}`}></div>
             </div>
 
             {/* Main Menu Grid */}
@@ -365,18 +373,18 @@ export default function App() {
                     <button
                       onClick={() => handleStartGame('training')}
                       id="play-feast-btn"
-                      className="w-full text-left p-4 md:p-5 rounded-none border-3 border-brand-charcoal bg-white hover:bg-brand-linen hover:shadow-[5px_5px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex flex-col gap-3"
+                      className={`w-full text-left ${viewportMode === 'telegram_pc' ? 'p-3' : 'p-4 md:p-5'} rounded-none border-3 border-brand-charcoal bg-white hover:bg-brand-linen hover:shadow-[5px_5px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex flex-col gap-2`}
                     >
                       <div className="flex items-center justify-between gap-2 w-full">
-                        <span className="font-serif font-black text-base md:text-lg text-brand-charcoal group-hover:text-brand-red flex items-center gap-1.5 transition-colors">
+                        <span className={`font-serif font-black ${viewportMode === 'telegram_pc' ? 'text-sm' : 'text-base md:text-lg'} text-brand-charcoal group-hover:text-brand-red flex items-center gap-1.5 transition-colors`}>
                           Enter Dumpling Feast 🥟🍵
                         </span>
-                        <span className="p-2.5 md:p-3 border-2 border-brand-charcoal rounded-none bg-brand-red text-white group-hover:bg-brand-charcoal transition-colors flex-shrink-0 flex items-center justify-center">
-                          <Play className="w-5 h-5 fill-current" />
+                        <span className={`${viewportMode === 'telegram_pc' ? 'p-2' : 'p-2.5 md:p-3'} border-2 border-brand-charcoal rounded-none bg-brand-red text-white group-hover:bg-brand-charcoal transition-colors flex-shrink-0 flex items-center justify-center`}>
+                          <Play className="w-4 h-4 fill-current" />
                         </span>
                       </div>
-                      <p className="text-xs text-brand-charcoal/80 leading-relaxed font-sans border-t border-brand-charcoal/15 pt-2">
-                        A Zen Focus Exercise: Feed the Master freshly-steamed dumplings and sip Matcha tea! Keep pesky flies off the food and drink using your chopsticks.
+                      <p className="text-[11px] text-brand-charcoal/80 leading-snug font-sans border-t border-brand-charcoal/15 pt-1.5">
+                        A Zen Focus Exercise: Feed the Master dumplings and sip Matcha tea! Keep flies off food.
                       </p>
                       <div className="w-full py-2.5 bg-brand-red text-white border-2 border-brand-charcoal font-serif font-black text-xs md:text-sm text-center tracking-wider uppercase group-hover:bg-brand-charcoal transition-colors shadow-[2px_2px_0px_0px_#1A1A1A] flex items-center justify-center gap-2">
                         <Play className="w-4 h-4 fill-current" /> Start Game Now
@@ -417,6 +425,27 @@ export default function App() {
                       >
                         <Smartphone className="w-3.5 h-3.5" /> Telegram PC (370×574)
                       </button>
+                  </div>
+
+                  {/* Input Mode Toggle (Simulate Touchscreen on PC) */}
+                  <div className="bg-brand-ivory border-2 border-brand-charcoal p-3 rounded-none flex items-center justify-between">
+                    <span className="font-serif font-black text-xs text-brand-charcoal flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 text-brand-red" /> Input Mode
+                    </span>
+                    <div className="flex border-2 border-brand-charcoal text-[10px] font-mono font-bold uppercase cursor-pointer select-none">
+                      <div 
+                        onClick={() => setSimulateTouch(false)}
+                        className={`px-2 py-1 transition-colors ${!simulateTouch ? 'bg-brand-charcoal text-white' : 'bg-white text-brand-charcoal hover:bg-brand-linen'}`}
+                      >
+                        PC Mouse 🖱️
+                      </div>
+                      <div 
+                        onClick={() => setSimulateTouch(true)}
+                        className={`px-2 py-1 transition-colors border-l-2 border-brand-charcoal ${simulateTouch ? 'bg-brand-red text-white' : 'bg-white text-brand-charcoal hover:bg-brand-linen'}`}
+                      >
+                        Simulated Touch 📱
+                      </div>
+                    </div>
                   </div>
 
                   {/* A/B Layout Tester Toggle (Luna's Fix) */}
@@ -756,6 +785,7 @@ export default function App() {
                 showHelper={showHelper}
                 soundEnabled={soundEnabled}
                 layoutMode={layoutMode}
+                simulateTouch={simulateTouch}
                 onGameEnd={handleGameEnd}
                 onStatsUpdate={setStats}
               />

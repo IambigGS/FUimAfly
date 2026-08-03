@@ -229,6 +229,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   // State to sync with React UI occasionally
   const [frenzyActive, setFrenzyActive] = useState(false);
   const frenzyTimerRef = useRef<number | null>(null);
+  const ninjaTimerRef = useRef<number | null>(null);
   const spawnTimerRef = useRef<number | null>(null);
   const secondTimerRef = useRef<number | null>(null);
 
@@ -364,13 +365,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // Trigger bullet time slow motion
       timeScaleRef.current = 0.35;
 
-      const timeoutId = setTimeout(() => {
+      if (ninjaTimerRef.current) clearTimeout(ninjaTimerRef.current);
+      ninjaTimerRef.current = window.setTimeout(() => {
         setFlyCatchable(newFly.id, true);
         timeScaleRef.current = 1.0;
+        ninjaTimerRef.current = null;
       }, 21000);
 
       audio.playNinjaClipForLevel(currentLevelRef.current, () => {
-        clearTimeout(timeoutId);
+        if (ninjaTimerRef.current) clearTimeout(ninjaTimerRef.current);
+        ninjaTimerRef.current = null;
         setFlyCatchable(newFly.id, true);
         timeScaleRef.current = 1.0;
       });
@@ -2359,6 +2363,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (spawnTimerRef.current) clearInterval(spawnTimerRef.current);
       if (secondTimerRef.current) clearInterval(secondTimerRef.current);
       if (frenzyTimerRef.current) clearTimeout(frenzyTimerRef.current);
+      if (ninjaTimerRef.current) clearTimeout(ninjaTimerRef.current);
     };
   }, [isPlaying, gameMode]);
 
