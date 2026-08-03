@@ -1998,6 +1998,74 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     performPinchStrike(e.clientX, e.clientY);
   };
 
+  const tryFeedMaster = (mx: number, my: number) => {
+    if (!dragItemRef.current) return false;
+
+    const drag = dragItemRef.current;
+    const mouth = mouthRef.current;
+    const dist = getDistance(mx, my, mouth.x, mouth.y);
+
+    if (dist <= mouth.radius + 30) {
+      // Reached Master's Mouth!
+      if (drag.type === 'dumpling') {
+        if (sipNeededRef.current) {
+          // Master needs tea first!
+          addFloatingText(mouth.x, mouth.y - 20, 'Master is thirsty! Take a sip 🍵', '#b45309');
+          if (soundEnabled) audio.playClack();
+        } else {
+          // Eat dumpling!
+          const d = dumplingsRef.current.find((dum) => dum.id === drag.id);
+          if (d && !d.isEaten) {
+            d.isEaten = true;
+            dumplingsEatenThisLevelRef.current++;
+            dumplingsEatenSinceLastDrinkRef.current++;
+
+            if (soundEnabled) audio.playMunch();
+            addFloatingText(mouth.x, mouth.y - 20, 'Munch! 🥟 +150p', '#10b981');
+            createCaptureParticles(mouth.x, mouth.y, '#ebdcb9', 10);
+
+            statsRef.current.score += 150;
+            onStatsUpdate({ ...statsRef.current });
+
+            // Check Tea Sip Rule (Level 1: 2 dumplings, Level 2+: 3 dumplings)
+            const lvl = currentLevelRef.current;
+            const threshold = lvl === 1 ? 2 : 3;
+            if (dumplingsEatenSinceLastDrinkRef.current >= threshold) {
+              sipNeededRef.current = true;
+            }
+
+            // Check Level Complete
+            const remaining = dumplingsRef.current.filter((dum) => !dum.isEaten).length;
+            if (remaining === 0) {
+              if (soundEnabled) audio.playSfx('levelup');
+              addFloatingText(window.innerWidth / 2, window.innerHeight / 3, `LEVEL ${lvl} COMPLETE! 🏆`, '#eab308');
+              currentLevelRef.current++;
+              setTimeout(() => {
+                initLevelDumplings(currentLevelRef.current);
+              }, 800);
+            }
+          }
+        }
+      } else if (drag.type === 'tea') {
+        if (sipNeededRef.current) {
+          // Drink Matcha Tea!
+          if (soundEnabled) audio.playGulp();
+          sipNeededRef.current = false;
+          dumplingsEatenSinceLastDrinkRef.current = 0;
+          addFloatingText(mouth.x, mouth.y - 20, 'Ahhh! Refreshing 🍵🍃', '#16a34a');
+          createCaptureParticles(mouth.x, mouth.y, '#4ade80', 12);
+        } else {
+          addFloatingText(mouth.x, mouth.y - 20, 'Not thirsty yet! 🍵', '#654321');
+        }
+      }
+
+      dragItemRef.current = null;
+      mouth.isOpen = false;
+      return true;
+    }
+    return false;
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isPlaying) return;
     const canvas = canvasRef.current;
@@ -2009,20 +2077,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     mouseRef.current.x = mx;
     mouseRef.current.y = my;
 
-    if (isTouchMode()) {
-      if (dragItemRef.current) {
-        const mouth = mouthRef.current;
-        const dist = getDistance(mx, my, mouth.x, mouth.y);
-        mouth.isOpen = dist <= mouth.radius + 25;
-      }
-      return;
-    }
-
-    // Open mouth visual feedback when dragging near mouth
     if (dragItemRef.current) {
       const mouth = mouthRef.current;
       const dist = getDistance(mx, my, mouth.x, mouth.y);
       mouth.isOpen = dist <= mouth.radius + 25;
+      tryFeedMaster(mx, my);
     }
   };
 
@@ -2030,69 +2089,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     if (!isPlaying) return;
 
     if (dragItemRef.current) {
-      const drag = dragItemRef.current;
       const mx = mouseRef.current.x;
       const my = mouseRef.current.y;
-      const mouth = mouthRef.current;
-      const dist = getDistance(mx, my, mouth.x, mouth.y);
-
-      if (dist <= mouth.radius + 30) {
-        // Dropped into Master's Mouth!
-        if (drag.type === 'dumpling') {
-          if (sipNeededRef.current) {
-            // Master needs tea first!
-            addFloatingText(mouth.x, mouth.y - 20, 'Master is thirsty! Take a sip 🍵', '#b45309');
-            if (soundEnabled) audio.playClack();
-          } else {
-            // Eat dumpling!
-            const d = dumplingsRef.current.find((dum) => dum.id === drag.id);
-            if (d && !d.isEaten) {
-              d.isEaten = true;
-              dumplingsEatenThisLevelRef.current++;
-              dumplingsEatenSinceLastDrinkRef.current++;
-
-              if (soundEnabled) audio.playMunch();
-              addFloatingText(mouth.x, mouth.y - 20, 'Munch! 🥟 +150p', '#10b981');
-              createCaptureParticles(mouth.x, mouth.y, '#ebdcb9', 10);
-
-              statsRef.current.score += 150;
-              onStatsUpdate({ ...statsRef.current });
-
-              // Check Tea Sip Rule (Level 1: 2 dumplings, Level 2+: 3 dumplings)
-              const lvl = currentLevelRef.current;
-              const threshold = lvl === 1 ? 2 : 3;
-              if (dumplingsEatenSinceLastDrinkRef.current >= threshold) {
-                sipNeededRef.current = true;
-              }
-
-              // Check Level Complete
-              const remaining = dumplingsRef.current.filter((dum) => !dum.isEaten).length;
-              if (remaining === 0) {
-                if (soundEnabled) audio.playSfx('levelup');
-                addFloatingText(window.innerWidth / 2, window.innerHeight / 3, `LEVEL ${lvl} COMPLETE! 🏆`, '#eab308');
-                currentLevelRef.current++;
-                setTimeout(() => {
-                  initLevelDumplings(currentLevelRef.current);
-                }, 800);
-              }
-            }
-          }
-        } else if (drag.type === 'tea') {
-          if (sipNeededRef.current) {
-            // Drink Matcha Tea!
-            if (soundEnabled) audio.playGulp();
-            sipNeededRef.current = false;
-            dumplingsEatenSinceLastDrinkRef.current = 0;
-            addFloatingText(mouth.x, mouth.y - 20, 'Ahhh! Refreshing 🍵🍃', '#16a34a');
-            createCaptureParticles(mouth.x, mouth.y, '#4ade80', 12);
-          } else {
-            addFloatingText(mouth.x, mouth.y - 20, 'Not thirsty yet! 🍵', '#654321');
-          }
-        }
+      const fed = tryFeedMaster(mx, my);
+      if (!fed) {
+        dragItemRef.current = null;
+        mouthRef.current.isOpen = false;
       }
-
-      dragItemRef.current = null;
-      mouth.isOpen = false;
     } else {
       handleReleasePinch();
     }
@@ -2202,6 +2205,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const mouth = mouthRef.current;
         const dist = getDistance(mx, my, mouth.x, mouth.y);
         mouth.isOpen = dist <= mouth.radius + 25;
+        tryFeedMaster(mx, my);
       }
     }
   };
