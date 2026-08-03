@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Fly, FlyType, Particle, GameStats, ChopstickConfig } from '../types';
 import { audio, getAssetUrl } from '../utils/audio';
 import { CHOPSTICK_STYLES } from './SettingsModal';
@@ -35,12 +35,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   chopstickStyleId,
   showHelper,
   soundEnabled,
-  layoutMode = 'original',
+  layoutMode = 'triangular',
   simulateTouch = false,
   onGameEnd,
   onStatsUpdate,
 }) => {
   const isTouchMode = () => simulateTouch || isMobileOrTouchDevice();
+  const [activeCutscene, setActiveCutscene] = useState<'intro' | 'ninja' | null>(null);
+  const cutsceneActive = activeCutscene !== null;
+  const introPlayedRef = useRef(false);
+  const isGoldenSweepActiveRef = useRef(false);
+  const goldenSweepStateRef = useRef<'TARGETING' | 'CATCHING' | 'RELEASING' | 'IDLE'>('IDLE');
+  const goldenSweepTargetFlyRef = useRef<Fly | null>(null);
+  const cutscenePlayedRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -116,6 +123,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const dumplingImgRef = useRef<HTMLImageElement | null>(null);
   const drinkImgRef = useRef<HTMLImageElement | null>(null);
   const mouthImgRef = useRef<HTMLImageElement | null>(null);
+  const ninjaFlyImgRef = useRef<HTMLImageElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (cutsceneActive && videoRef.current) {
+      // Force playback, catch Autoplay blocking errors
+      videoRef.current.play().catch((e) => {
+        console.warn("Autoplay blocked, attempting muted fallback", e);
+        if (videoRef.current) {
+          videoRef.current.muted = true;
+          videoRef.current.play().catch(console.error);
+        }
+      });
+    }
+  }, [cutsceneActive]);
 
   useEffect(() => {
     const dImg = new Image();
@@ -129,6 +151,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const mImg = new Image();
     mImg.src = getAssetUrl('mouth.jpg');
     mImg.onload = () => { mouthImgRef.current = mImg; };
+
+    const nImg = new Image();
+    nImg.src = getAssetUrl('ninja_fly_chopsticks.jpg');
+    nImg.onload = () => { ninjaFlyImgRef.current = nImg; };
   }, []);
 
   const teaRef = useRef<{
@@ -383,6 +409,52 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     return newFly;
   };
 
+  const finishCutscene = useCallback(() => {
+    setActiveCutscene((currentType) => {
+      if (currentType === 'ninja') {
+        cutscenePlayedRef.current = true;
+        hasSpawnedNinjaThisSession.current = true;
+        const existingNinja = fliesRef.current.find((f) => f.type === 'ninja');
+        if (!existingNinja) {
+          fliesRef.current.push(createFly('ninja'));
+        }
+      } else if (currentType === 'intro') {
+        introPlayedRef.current = true;
+      }
+      return null;
+    });
+  }, []);
+
+  const startIntroCutscene = useCallback(() => {
+    if (introPlayedRef.current) return;
+    dragItemRef.current = null;
+    setActiveCutscene('intro');
+  }, []);
+
+  const startNinjaCutscene = useCallback(() => {
+    if (hasSpawnedNinjaThisSession.current || cutscenePlayedRef.current) return;
+    hasSpawnedNinjaThisSession.current = true;
+    cutscenePlayedRef.current = true;
+    dragItemRef.current = null;
+    setActiveCutscene('ninja');
+  }, []);
+
+  useEffect(() => {
+    if (isPlaying && !introPlayedRef.current) {
+      startIntroCutscene();
+    }
+  }, [isPlaying, startIntroCutscene]);
+
+  useEffect(() => {
+    if (activeCutscene) {
+      const timeoutMs = activeCutscene === 'intro' ? 30000 : 7500;
+      const timer = setTimeout(() => {
+        finishCutscene();
+      }, timeoutMs);
+      return () => clearTimeout(timer);
+    }
+  }, [activeCutscene, finishCutscene]);
+
   // Trigger high-value particles
   const createCaptureParticles = (x: number, y: number, color: string, count = 15) => {
     for (let i = 0; i < count; i++) {
@@ -575,21 +647,83 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     handleResize();
 
-    // Spawn 3 initial flies
-    fliesRef.current = [
-      createFly('housefly'),
-      createFly('bluebottle'),
-      createFly('fruitfly'),
-    ];
+    // Spawn 3 initial flies if none exist
+    if (fliesRef.current.length === 0) {
+      fliesRef.current = [
+        createFly('housefly'),
+        createFly('bluebottle'),
+        createFly('fruitfly'),
+      ];
+    }
 
     // Main animation ticks
     const renderLoop = () => {
+      if (cutsceneActive) {
+        animFrameId = requestAnimationFrame(renderLoop);
+        return;
+      }
+
       if (!ctx || !canvas) return;
 
       const diffSettings = getDifficultySettings();
 
       // Clear main arena
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // --- GOLDEN AUTO-SWEEP STATE MACHINE ---
+      if (isGoldenSweepActiveRef.current) {
+        const state = goldenSweepStateRef.current;
+        const rw = releaseWindowRef.current;
+        
+        if (state === 'IDLE' || state === 'TARGETING') {
+          const target = fliesRef.current.find(f => !f.isCaught && f.state === 'active' && f.type !== 'ninja');
+          if (target) {
+            goldenSweepTargetFlyRef.current = target;
+            goldenSweepStateRef.current = 'CATCHING';
+          } else {
+            isGoldenSweepActiveRef.current = false;
+            goldenSweepStateRef.current = 'IDLE';
+            setFrenzyActive(false);
+          }
+        } else if (state === 'CATCHING' && goldenSweepTargetFlyRef.current) {
+          const target = goldenSweepTargetFlyRef.current;
+          if (target.isCaught || target.state !== 'active') {
+            goldenSweepStateRef.current = 'TARGETING';
+          } else {
+            mouseRef.current.x += (target.x - mouseRef.current.x) * 0.25;
+            mouseRef.current.y += (target.y - mouseRef.current.y) * 0.25;
+            if (getDistance(mouseRef.current.x, mouseRef.current.y, target.x, target.y) < 25) {
+              target.isCaught = true;
+              target.caughtTime = Date.now();
+              if (target.landingTargetId === 'tea') {
+                teaRef.current.isBlockedByFly = false;
+              } else if (target.landingTargetId) {
+                const d = dumplingsRef.current.find((dum) => dum.id === target.landingTargetId);
+                if (d) d.isBlockedByFly = false;
+              }
+              target.landingTargetId = undefined;
+              createCaptureParticles(target.x, target.y, '#eab308', 10);
+              if (soundEnabled) audio.playCatch('combo');
+              goldenSweepStateRef.current = 'RELEASING';
+            }
+          }
+        } else if (state === 'RELEASING' && goldenSweepTargetFlyRef.current) {
+           const target = goldenSweepTargetFlyRef.current;
+           mouseRef.current.x += (rw.x - mouseRef.current.x) * 0.15;
+           mouseRef.current.y += (rw.y - mouseRef.current.y) * 0.15;
+           
+           if (getDistance(mouseRef.current.x, mouseRef.current.y, rw.x, rw.y) < 40) {
+              target.isCaught = false;
+              target.state = 'releasing';
+              createCaptureParticles(rw.x, rw.y, '#fef08a', 15);
+              if (soundEnabled) audio.playCatch('rare');
+              statsRef.current.score += target.points * 2;
+              statsRef.current.fliesCaught++;
+              goldenSweepStateRef.current = 'TARGETING';
+           }
+        }
+      }
+      // --- END GOLDEN AUTO-SWEEP ---
 
       const flies = fliesRef.current;
       const cTip = chopstickTipRef.current;
@@ -1372,69 +1506,80 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.restore();
         }
 
-        // Fly wings flap oscillation
-        fly.wingAngle += fly.wingSpeed * timeScaleRef.current;
-        const wingOffset = Math.sin(fly.wingAngle) * 0.6;
+        if (fly.type === 'ninja' && fly.isCatchable === false && ninjaFlyImgRef.current) {
+          // Draw the Luna-generated sprite
+          const img = ninjaFlyImgRef.current;
+          // Scale it appropriately (fly.size is usually small, so we scale it up a bit)
+          const scale = (fly.size * 3.5) / img.width;
+          ctx.save();
+          ctx.scale(scale, scale);
+          ctx.drawImage(img, -img.width / 2, -img.height / 2);
+          ctx.restore();
+        } else {
+          // Fly wings flap oscillation
+          fly.wingAngle += fly.wingSpeed * timeScaleRef.current;
+          const wingOffset = Math.sin(fly.wingAngle) * 0.6;
 
-        // Draw wings
-        ctx.fillStyle = fly.wingColor;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.lineWidth = 1;
-
-        // Left wing
-        ctx.save();
-        ctx.translate(-fly.size * 0.4, -fly.size * 0.1);
-        ctx.rotate(-Math.PI / 4 + wingOffset);
-        ctx.beginPath();
-        ctx.ellipse(0, -fly.size * 0.7, fly.size * 0.35, fly.size * 0.7, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-
-        // Right wing
-        ctx.save();
-        ctx.translate(fly.size * 0.4, -fly.size * 0.1);
-        ctx.rotate(Math.PI / 4 - wingOffset);
-        ctx.beginPath();
-        ctx.ellipse(0, -fly.size * 0.7, fly.size * 0.35, fly.size * 0.7, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-
-        // Draw Fly Legs (legs stick out slightly on larger flies)
-        if (fly.size > 10) {
-          ctx.strokeStyle = '#262626';
+          // Draw wings
+          ctx.fillStyle = fly.wingColor;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
           ctx.lineWidth = 1;
-          // Left legs
+
+          // Left wing
+          ctx.save();
+          ctx.translate(-fly.size * 0.4, -fly.size * 0.1);
+          ctx.rotate(-Math.PI / 4 + wingOffset);
           ctx.beginPath();
-          ctx.moveTo(-2, 0); ctx.lineTo(-fly.size * 0.7, -2);
-          ctx.moveTo(-2, 2); ctx.lineTo(-fly.size * 0.7, 3);
+          ctx.ellipse(0, -fly.size * 0.7, fly.size * 0.35, fly.size * 0.7, 0, 0, Math.PI * 2);
+          ctx.fill();
           ctx.stroke();
-          // Right legs
+          ctx.restore();
+
+          // Right wing
+          ctx.save();
+          ctx.translate(fly.size * 0.4, -fly.size * 0.1);
+          ctx.rotate(Math.PI / 4 - wingOffset);
           ctx.beginPath();
-          ctx.moveTo(2, 0); ctx.lineTo(fly.size * 0.7, -2);
-          ctx.moveTo(2, 2); ctx.lineTo(fly.size * 0.7, 3);
+          ctx.ellipse(0, -fly.size * 0.7, fly.size * 0.35, fly.size * 0.7, 0, 0, Math.PI * 2);
+          ctx.fill();
           ctx.stroke();
+          ctx.restore();
+
+          // Draw Fly Legs (legs stick out slightly on larger flies)
+          if (fly.size > 10) {
+            ctx.strokeStyle = '#262626';
+            ctx.lineWidth = 1;
+            // Left legs
+            ctx.beginPath();
+            ctx.moveTo(-2, 0); ctx.lineTo(-fly.size * 0.7, -2);
+            ctx.moveTo(-2, 2); ctx.lineTo(-fly.size * 0.7, 3);
+            ctx.stroke();
+            // Right legs
+            ctx.beginPath();
+            ctx.moveTo(2, 0); ctx.lineTo(fly.size * 0.7, -2);
+            ctx.moveTo(2, 2); ctx.lineTo(fly.size * 0.7, 3);
+            ctx.stroke();
+          }
+
+          // Draw Thorax / Body
+          ctx.fillStyle = fly.color;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, fly.size * 0.5, fly.size * 0.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Draw Abdomen (segmented lines)
+          ctx.fillStyle = fly.type === 'golden' ? '#eab308' : '#262626';
+          ctx.beginPath();
+          ctx.ellipse(0, fly.size * 0.4, fly.size * 0.35, fly.size * 0.45, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Draw Eyes (compound glowing red eyes)
+          ctx.fillStyle = fly.type === 'golden' ? '#ffffff' : fly.type === 'fruitfly' ? '#ea580c' : '#b91c1c';
+          ctx.beginPath();
+          ctx.arc(-fly.size * 0.25, -fly.size * 0.4, fly.size * 0.18, 0, Math.PI * 2);
+          ctx.arc(fly.size * 0.25, -fly.size * 0.4, fly.size * 0.18, 0, Math.PI * 2);
+          ctx.fill();
         }
-
-        // Draw Thorax / Body
-        ctx.fillStyle = fly.color;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, fly.size * 0.5, fly.size * 0.6, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Draw Abdomen (segmented lines)
-        ctx.fillStyle = fly.type === 'golden' ? '#eab308' : '#262626';
-        ctx.beginPath();
-        ctx.ellipse(0, fly.size * 0.4, fly.size * 0.35, fly.size * 0.45, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Draw Eyes (compound glowing red eyes)
-        ctx.fillStyle = fly.type === 'golden' ? '#ffffff' : fly.type === 'fruitfly' ? '#ea580c' : '#b91c1c';
-        ctx.beginPath();
-        ctx.arc(-fly.size * 0.25, -fly.size * 0.4, fly.size * 0.18, 0, Math.PI * 2);
-        ctx.arc(fly.size * 0.25, -fly.size * 0.4, fly.size * 0.18, 0, Math.PI * 2);
-        ctx.fill();
 
         ctx.restore();
 
@@ -1728,7 +1873,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       audio.stopFlybyNarration();
       audio.clearAllBuzzers();
     };
-  }, [isPlaying, gameMode, difficulty, chopstickStyleId, showHelper, soundEnabled, frenzyActive]);
+  }, [isPlaying, gameMode, difficulty, chopstickStyleId, showHelper, soundEnabled, frenzyActive, cutsceneActive]);
 
   // Handle Game Input Interactions (Clicks / Touches to PINCH)
   const performPinchStrike = (clientX?: number, clientY?: number) => {
@@ -1812,13 +1957,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       createCaptureParticles(fly.x, fly.y, fly.color, 10);
       createCaptureParticles(fly.x, fly.y, 'rgba(255, 255, 255, 0.8)', 5);
 
-      // Trigger Floating typography
-      addFloatingText(fly.x, fly.y - 15, 'Captured! 🥢', '#eab308');
-
       // Trigger crisp capture clack
       if (soundEnabled) {
         audio.playClack();
       }
+      
+      // Auto-Release the fly instantly (as requested for PC controls)
+      releaseFlyToFreedom(fly);
     } else {
       // Strike Miss
       stats.combo = 0;
@@ -1870,6 +2015,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const triggerFrenzy = () => {
     setFrenzyActive(true);
+    isGoldenSweepActiveRef.current = true;
+    goldenSweepStateRef.current = 'TARGETING';
     addFloatingText(window.innerWidth / 2, window.innerHeight / 3, 'GOLDEN FRENZY TIME!', '#eab308');
     
     if (soundEnabled) {
@@ -1893,7 +2040,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // PC Mouse Handlers for Dragging Dumplings/Tea & Pinching Chopsticks
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isPlaying) return;
+    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -2038,6 +2185,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               sipNeededRef.current = true;
             }
 
+            // Immediately trigger Ninja Fly Cutscene after 2nd dumpling on Level 1
+            if (
+              !hasSpawnedNinjaThisSession.current &&
+              lvl === 1 &&
+              dumplingsEatenThisLevelRef.current >= 2 &&
+              !cutscenePlayedRef.current
+            ) {
+              startNinjaCutscene();
+            }
+
             // Check Level Complete
             const remaining = dumplingsRef.current.filter((dum) => !dum.isEaten).length;
             if (remaining === 0) {
@@ -2071,7 +2228,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isPlaying) return;
+    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -2117,7 +2274,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // Touch handlers for mobile players (Tap-to-Catch)
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!isPlaying || e.touches.length === 0) return;
+    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive || e.touches.length === 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -2189,7 +2346,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isPlaying || e.touches.length === 0) return;
+    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive || e.touches.length === 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -2215,7 +2372,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isPlaying) return;
+    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive) return;
     if (!isTouchMode()) {
       handleReleasePinch();
     } else {
@@ -2342,10 +2499,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     secondTimerRef.current = window.setInterval(() => {
       const stats = statsRef.current;
       
-      // Spawning condition for Ninja Fly
-      if (!hasSpawnedNinjaThisSession.current && stats.fliesCaught >= 4) {
-        hasSpawnedNinjaThisSession.current = true;
-        fliesRef.current.push(createFly('ninja'));
+      // Spawning condition for Ninja Fly (Triggers on Level 1 after 2 dumplings are eaten)
+      if (
+        !hasSpawnedNinjaThisSession.current &&
+        currentLevelRef.current === 1 &&
+        dumplingsEatenThisLevelRef.current >= 2 &&
+        !cutscenePlayedRef.current
+      ) {
+        startNinjaCutscene();
       }
 
       // Check Feast Health status
@@ -2383,6 +2544,35 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     >
       {/* High FPS Game Arena Canvas */}
       <canvas ref={canvasRef} id="arcade-game-canvas" className="block w-full h-full" />
+
+      {/* Cinematic Cutscene Overlay */}
+      {cutsceneActive && (
+        <div 
+          className="absolute inset-0 z-30 bg-black cursor-pointer flex items-center justify-center overflow-hidden"
+          onClick={finishCutscene}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            muted={!soundEnabled}
+            playsInline
+            onEnded={finishCutscene}
+            onError={(e) => {
+              console.warn("Cutscene video error, skipping to gameplay:", e);
+              finishCutscene();
+            }}
+            className="w-full h-full object-cover pointer-events-none"
+            src={getAssetUrl(
+              activeCutscene === 'intro'
+                ? 'assets/videos/Intro_Scene_p123.mp4'
+                : 'assets/videos/Ninja_Fly_TakeOver_01.mp4'
+            )}
+          />
+          <div className="absolute bottom-6 right-6 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 animate-pulse pointer-events-none">
+            Tap anywhere to skip ⏩
+          </div>
+        </div>
+      )}
 
       {/* Golden Frenzy screen flashing border indicator */}
       {frenzyActive && (

@@ -72,8 +72,8 @@ export default function App() {
     }
   });
 
-  // A/B Layout Testing Mode
-  const [layoutMode, setLayoutMode] = useState<'original' | 'triangular'>('triangular');
+  // Triangular Layout (Luna's Layout) is committed as the default game layout
+  const layoutMode = 'triangular';
   const [simulateTouch, setSimulateTouch] = useState<boolean>(false);
 
   const handleViewportModeChange = (mode: 'desktop' | 'telegram_pc') => {
@@ -448,26 +448,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* A/B Layout Tester Toggle (Luna's Fix) */}
-                  <div className="bg-brand-ivory border-2 border-brand-charcoal p-3 rounded-none flex items-center justify-between">
-                    <span className="font-serif font-black text-xs text-brand-charcoal flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Mobile Layout
-                    </span>
-                    <div className="flex border-2 border-brand-charcoal text-[10px] font-mono font-bold uppercase cursor-pointer select-none">
-                      <div 
-                        onClick={() => setLayoutMode('original')}
-                        className={`px-2 py-1 transition-colors ${layoutMode === 'original' ? 'bg-brand-charcoal text-white' : 'bg-white text-brand-charcoal hover:bg-brand-linen'}`}
-                      >
-                        Original
-                      </div>
-                      <div 
-                        onClick={() => setLayoutMode('triangular')}
-                        className={`px-2 py-1 transition-colors border-l-2 border-brand-charcoal ${layoutMode === 'triangular' ? 'bg-indigo-600 text-white' : 'bg-white text-brand-charcoal hover:bg-brand-linen'}`}
-                      >
-                        Triangular (Luna)
-                      </div>
-                    </div>
-                  </div>
+
                   </div>
                 </div>
 
@@ -606,8 +587,8 @@ export default function App() {
             exit={{ opacity: 0 }}
             className="flex-1 flex items-stretch justify-stretch z-10 select-none overflow-hidden relative"
           >
-            {/* Minimal Overlay HUD for Mobile & Telegram PC */}
-            <div className={`${viewportMode === 'telegram_pc' ? 'flex' : 'flex md:hidden'} absolute top-4 left-4 right-4 z-30 justify-between items-start pointer-events-none`}>
+            {/* Minimal Overlay HUD for Gameplay */}
+            <div className="flex absolute top-4 left-4 right-4 z-30 justify-between items-start pointer-events-none">
               <div className="flex gap-2">
                 <div className="bg-white/90 backdrop-blur-sm border-2 border-brand-charcoal px-3 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto">
                   <span className="font-serif font-black text-xl text-brand-charcoal">{stats.score}</span>
@@ -638,142 +619,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Left HUD Stats Panel (Only shown in Full Desktop mode) */}
-            {viewportMode !== 'telegram_pc' && (
-              <div className="hidden md:flex w-80 bg-brand-ivory border-r-3 border-brand-charcoal p-5 flex-col justify-between z-20 shadow-none">
-              {/* Top Section */}
-              <div className="space-y-4">
-                {/* Header back & Pause buttons */}
-                <div className="flex justify-between items-center">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-brand-red font-mono font-bold uppercase tracking-widest">
-                      DOJO ARENA
-                    </span>
-                    <h3 className="font-serif font-black text-lg text-brand-charcoal">
-                      The Master's Feast 🥟🥤
-                    </h3>
-                  </div>
 
-                  <button
-                    onClick={() => {
-                      if (confirm('Return to Dojo Menu? Your active score will be lost.')) {
-                        setGameState('menu');
-                        audio.clearAllBuzzers();
-                      }
-                    }}
-                    id="back-to-menu-btn"
-                    className="px-3 py-1.5 text-xs bg-white hover:bg-brand-linen border-2 border-brand-charcoal rounded-none text-brand-charcoal font-serif font-black transition-all cursor-pointer shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[3px_3px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0"
-                  >
-                    Exit Dojo
-                  </button>
-                </div>
-
-                {/* Main Stats Display */}
-                <div className="space-y-3 pt-3 border-t-2 border-brand-charcoal">
-                  {/* Level & Dumplings Counter */}
-                  <div className="p-3 bg-white border-2 border-brand-charcoal rounded-none">
-                    <div className="flex justify-between items-center text-xs text-brand-charcoal font-black font-serif mb-1">
-                      <span className="flex items-center gap-1">
-                        <Award className="w-3.5 h-3.5 text-brand-red" /> Level {stats.level || 1}
-                      </span>
-                      <span className="font-mono text-brand-charcoal font-bold">{stats.dumplingsLeft || 0} Dumplings Left</span>
-                    </div>
-                  </div>
-
-                  {/* Soda Sip Required Warning Banner */}
-                  {stats.sipNeeded && (
-                    <div className="p-3 bg-amber-100 border-2 border-amber-800 rounded-none animate-pulse flex items-center justify-between text-amber-900 font-serif font-black text-xs">
-                      <span className="flex items-center gap-1.5">
-                        🥤 Master is thirsty!
-                      </span>
-                      <span className="underline decoration-amber-800">Drag Soda to Mouth</span>
-                    </div>
-                  )}
-
-                  {/* SCORE */}
-                  <div className="bg-white border-2 border-brand-charcoal p-3 rounded-none text-center relative overflow-hidden">
-                    <span className="text-[10px] text-brand-charcoal/60 block font-mono font-bold">
-                      ACCUMULATED SCORE
-                    </span>
-                    <span className="font-serif font-black text-3xl text-brand-charcoal">
-                      {stats.score}
-                    </span>
-
-                    {/* Active Streak Combo multiplier highlight */}
-                    {stats.combo > 0 && (
-                      <div className="mt-1 flex justify-center">
-                        <span className="px-2 py-0.5 border border-brand-charcoal bg-brand-red text-white text-xs font-mono font-bold rounded-none animate-bounce">
-                          {stats.combo} Combo (x{Math.min(5, Math.ceil(stats.combo / 4))} pts)
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Accuracy & Counts */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-white border-2 border-brand-charcoal p-2 rounded-none text-center">
-                      <span className="text-[9px] text-brand-charcoal/60 block font-mono font-bold">
-                        ACCURACY
-                      </span>
-                      <span className="font-black text-brand-charcoal font-mono">
-                        {stats.accuracy}%
-                      </span>
-                    </div>
-
-                    <div className="bg-white border-2 border-brand-charcoal p-2 rounded-none text-center">
-                      <span className="text-[9px] text-brand-charcoal/60 block font-mono font-bold">
-                        SAFELY RELEASED 🌸
-                      </span>
-                      <span className="font-black text-brand-charcoal font-mono">
-                        {stats.fliesCaught}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Live Caught Species Breakdown */}
-                <div className="pt-3 border-t-2 border-brand-charcoal space-y-2">
-                  <h4 className="text-[10px] text-brand-charcoal/70 font-mono font-bold uppercase tracking-widest">
-                    Safe Release Log 🌸
-                  </h4>
-                  <div className="space-y-1.5 text-xs font-serif">
-                    <div className="flex justify-between items-center text-brand-charcoal font-medium">
-                      <span>🪰 Houseflies:</span>
-                      <span className="font-mono font-bold">{stats.fliesTypeCount.housefly}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-brand-charcoal font-medium">
-                      <span>🔵 Bluebottles:</span>
-                      <span className="font-mono font-bold">{stats.fliesTypeCount.bluebottle}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-brand-charcoal font-medium">
-                      <span>🟠 Fruitflies:</span>
-                      <span className="font-mono font-bold">{stats.fliesTypeCount.fruitfly}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-brand-red font-bold">
-                      <span>✨ Golden Empress:</span>
-                      <span className="font-mono font-bold">{stats.fliesTypeCount.golden}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-purple-600 font-bold">
-                      <span>🥋 Ninja Sensei:</span>
-                      <span className="font-mono font-bold">{stats.fliesTypeCount.ninja}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Section: Controls */}
-              <div className="space-y-2 pt-4 border-t-2 border-brand-charcoal">
-                <div className="flex justify-between items-center text-xs text-brand-charcoal font-bold font-serif">
-                  <span>Difficulty: <strong className="capitalize underline decoration-brand-red">{difficulty}</strong></span>
-                  <span>Helper: <strong className="capitalize underline decoration-brand-red">{showHelper ? 'on' : 'off'}</strong></span>
-                </div>
-
-                <div className="bg-brand-linen border-2 border-brand-charcoal p-2.5 rounded-none text-[10px] text-brand-charcoal/90 leading-relaxed italic text-center font-serif">
-                  "Pinch the chopsticks to capture a fly, then carry it to the garden window at the top to release it safely!"
-                </div>
-              </div>
-            </div>
-            )}
 
             {/* Main Interactive High FPS Game Canvas Stage */}
             <div className="flex-1 relative bg-transparent overflow-hidden shadow-inner">

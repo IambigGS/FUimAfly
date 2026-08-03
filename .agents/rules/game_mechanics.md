@@ -4,15 +4,17 @@ description: "Core game mechanics and control schemes for Chopstick Fly Catcher"
 
 # Chopstick Fly Catcher - Game Mechanics & Control Schemes
 
-When modifying `GameCanvas.tsx` or any gameplay logic, agents MUST respect the following dual-control schemes. The game operates fundamentally differently depending on whether the player is using a Mouse (PC) or a Touchscreen (Mobile).
+When modifying `GameCanvas.tsx` or any gameplay logic, agents MUST respect the following mechanics:
 
 ## 1. PC (Mouse) Mechanics
 - **Chopsticks:** The chopsticks follow the user's cursor (`onMouseMove`).
-- **Flies:** The user must manually pinch the fly (click) and physically drag it up to the Release Window (top of screen) to safely release it.
-- **Feeding:** The user must click and drag dumplings or tea to the Master's mouth.
+- **Flies (Auto-Release):** When the user clicks to pinch a fly, it is captured and automatically released out the Garden Window with golden/pink sparkles and score points without requiring manual drag-and-drop to the top window.
+- **Feeding:** The user clicks and drags dumplings or tea to the Master's mouth.
 
 ## 2. Mobile (Touch) Mechanics
-- **Flies (Tap-to-Catch):** When the user taps a fly (either flying mid-air or landed on food), the chopsticks automatically catch the fly and transport it out the window. There is no manual dragging of flies to the window on touch devices.
+- **Flies (Tap-to-Catch):** When the user taps a fly (either flying mid-air or landed on food), the chopsticks automatically catch the fly and transport it out the window.
 - **Feeding:** The user taps and drags dumplings or tea to the Master's mouth. 
 
-**Critical Implementation Note:** Do NOT attempt to unify the `onTouch` and `onMouse` event handlers into a single `onPointer` handler if it compromises this dual mechanic. The logic for catching flies is intentionally divergent between the two input methods.
+## 3. Arena Layout & Viewport Rules
+- **Triangular Layout:** Committed as the default game layout across all devices.
+- **Full-Width Canvas:** The Left HUD Stats panel has been removed during gameplay so the arena canvas takes up 100% of the viewport width. Score, time/guard, and exit button are presented as a minimal top overlay.
