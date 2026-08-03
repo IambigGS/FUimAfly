@@ -20,6 +20,8 @@ import {
   ShieldAlert,
   ChevronRight,
   ChevronLeft,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 
 import { DojoBackground } from './components/DojoBackground';
@@ -42,10 +44,45 @@ export default function App() {
   const [masterVol, setMasterVol] = useState(0.5);
   const [musicVol, setMusicVol] = useState(0.3);
   const [sfxVol, setSfxVol] = useState(0.6);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('chop_sound') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    try {
+      localStorage.setItem('chop_sound', String(next));
+    } catch {}
+  };
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [selectedChopstickId, setSelectedChopstickId] = useState('bamboo');
   const [showHelper, setShowHelper] = useState(true);
+
+  // Viewport Simulator Mode ('desktop' vs 'telegram_pc')
+  const [viewportMode, setViewportMode] = useState<'desktop' | 'telegram_pc'>(() => {
+    try {
+      return (localStorage.getItem('dojo_viewport_mode') as 'desktop' | 'telegram_pc') || 'desktop';
+    } catch {
+      return 'desktop';
+    }
+  });
+
+  // A/B Layout Testing Mode
+  const [layoutMode, setLayoutMode] = useState<'original' | 'triangular'>('triangular');
+
+  const handleViewportModeChange = (mode: 'desktop' | 'telegram_pc') => {
+    setViewportMode(mode);
+    try {
+      localStorage.setItem('dojo_viewport_mode', mode);
+    } catch (e) {
+      console.warn('Failed to save viewport mode preference:', e);
+    }
+  };
 
   // Active Live Statistics
   const [stats, setStats] = useState<GameStats>({
@@ -240,42 +277,53 @@ export default function App() {
 
   const currentChopstick = CHOPSTICK_STYLES.find((s) => s.id === selectedChopstickId) || CHOPSTICK_STYLES[0];
 
-  return (
-    <div className="relative w-screen h-screen overflow-hidden bg-brand-linen flex flex-col font-sans select-none border-8 md:border-[20px] border-brand-charcoal">
+  const appCoreContent = (
+    <div className={`relative w-full h-full flex flex-col font-sans select-none ${viewportMode === 'desktop' ? 'border-8 md:border-[20px] border-brand-charcoal' : 'border-0'}`}>
       {/* Woodblock Frame Art Accents */}
       {/* 1. Dojo Ambiance Canvas Background */}
       <DojoBackground showBlossoms={true} windSpeed={gameState === 'playing' ? 1.4 : 0.8} />
 
       {/* Vertical Brand Watermark */}
-      <div className="hidden xl:block absolute left-10 top-1/2 -translate-y-1/2 select-none pointer-events-none text-brand-charcoal/[0.04] font-serif font-black tracking-widest text-8xl uppercase [writing-mode:vertical-rl] [text-orientation:mixed] z-0">
+      <div className={`${viewportMode === 'telegram_pc' ? 'hidden' : 'hidden xl:block'} absolute left-10 top-1/2 -translate-y-1/2 select-none pointer-events-none text-brand-charcoal/[0.04] font-serif font-black tracking-widest text-8xl uppercase [writing-mode:vertical-rl] [text-orientation:mixed] z-0`}>
         CHOPSTICK MASTER
       </div>
 
       {/* Red Calligraphy Seal Stamp */}
-      <div className="absolute top-6 left-6 z-20 w-12 h-12 border-2 border-brand-red border-dashed rounded-none flex items-center justify-center font-serif font-extrabold text-brand-red rotate-[-12deg] select-none pointer-events-none shadow-xs">
-        <span className="text-xl">禅</span>
+      <div className={`absolute ${viewportMode === 'telegram_pc' ? 'top-3 left-3 w-8 h-8 text-sm' : 'top-6 left-6 w-12 h-12 text-xl'} z-20 border-2 border-brand-red border-dashed rounded-none flex items-center justify-center font-serif font-extrabold text-brand-red rotate-[-12deg] select-none pointer-events-none shadow-xs`}>
+        <span>禅</span>
       </div>
 
-      {/* 2. Audio Ambiance toggle for easy quick-access */}
-      <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
-        <button
-          onClick={() => setSoundEnabled(!soundEnabled)}
-          id="audio-quick-toggle"
-          className="p-2.5 rounded-none bg-brand-ivory hover:bg-brand-linen border-2 border-brand-charcoal text-brand-charcoal hover:shadow-[3px_3px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-150 cursor-pointer shadow-none"
-          title={soundEnabled ? 'Silence Sounds' : 'Enable Sounds'}
-        >
-          {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-brand-red" />}
-        </button>
+      {/* 2. Audio Ambiance toggle & Viewport Quick-toggle (Only shown in Full Desktop mode when in menu) */}
+      {viewportMode === 'desktop' && gameState === 'menu' && (
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+          <button
+            onClick={() => handleViewportModeChange('telegram_pc')}
+            id="viewport-quick-toggle"
+            className="p-2.5 rounded-none bg-brand-ivory hover:bg-brand-linen border-2 border-brand-charcoal text-brand-charcoal hover:shadow-[3px_3px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-150 cursor-pointer shadow-none flex items-center gap-1 text-xs font-serif font-bold"
+            title="Switch to Telegram PC Mode (370×574)"
+          >
+            <Smartphone className="w-4 h-4 text-brand-red" />
+          </button>
 
-        <button
-          onClick={() => setShowSettings(true)}
-          id="settings-quick-toggle"
-          className="p-2.5 rounded-none bg-brand-ivory hover:bg-brand-linen border-2 border-brand-charcoal text-brand-charcoal hover:shadow-[3px_3px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-150 cursor-pointer shadow-none"
-          title="Dojo Settings"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-      </div>
+          <button
+            onClick={toggleSound}
+            id="audio-quick-toggle"
+            className="p-2.5 rounded-none bg-brand-ivory hover:bg-brand-linen border-2 border-brand-charcoal text-brand-charcoal hover:shadow-[3px_3px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-150 cursor-pointer shadow-none"
+            title={soundEnabled ? 'Silence Sounds' : 'Enable Sounds'}
+          >
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-brand-red" />}
+          </button>
+
+          <button
+            onClick={() => setShowSettings(true)}
+            id="settings-quick-toggle"
+            className="p-2.5 rounded-none bg-brand-ivory hover:bg-brand-linen border-2 border-brand-charcoal text-brand-charcoal hover:shadow-[3px_3px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-150 cursor-pointer shadow-none"
+            title="Dojo Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* 3. SCREEN PORTALS */}
       <AnimatePresence mode="wait">
@@ -290,23 +338,23 @@ export default function App() {
             className="flex-1 flex flex-col items-center justify-start md:justify-center pt-8 pb-12 px-4 md:p-8 z-10 select-none overflow-y-auto"
           >
             {/* Title Calligraphy Frame */}
-            <div className="text-center max-w-xl mb-6 md:mb-10 z-10">
+            <div className={`text-center max-w-xl ${viewportMode === 'telegram_pc' ? 'mb-3 pt-2' : 'mb-6 md:mb-10'} z-10`}>
               <span className="text-xs uppercase tracking-widest text-brand-red font-mono font-bold block mb-1">
                 🥢 Zen Training Dojo 🥢
               </span>
-              <h1 className="text-4xl md:text-5xl font-serif font-black text-brand-charcoal tracking-tight leading-none">
+              <h1 className={`${viewportMode === 'telegram_pc' ? 'text-2xl' : 'text-4xl md:text-5xl'} font-serif font-black text-brand-charcoal tracking-tight leading-none`}>
                 Chopstick Fly Catcher
               </h1>
-              <p className="text-xs md:text-sm text-brand-charcoal/80 mt-2 max-w-md mx-auto italic font-serif">
+              <p className="text-[11px] md:text-sm text-brand-charcoal/80 mt-1.5 max-w-md mx-auto italic font-serif">
                 "Concentration is the path to speed. Control your chopsticks, control your destiny."
               </p>
-              <div className="w-32 h-1 bg-brand-charcoal mx-auto mt-4"></div>
+              <div className="w-24 h-1 bg-brand-charcoal mx-auto mt-2.5"></div>
             </div>
 
             {/* Main Menu Grid */}
-            <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch z-10">
+            <div className={`w-full ${viewportMode === 'telegram_pc' ? 'max-w-xs flex flex-col gap-4' : 'max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-6'} items-stretch z-10`}>
               {/* Left Column: Mode Selection */}
-              <div className="lg:col-span-7 bg-brand-ivory border-3 border-brand-charcoal rounded-none p-5 md:p-6 flex flex-col justify-between shadow-[6px_6px_0px_0px_#1A1A1A]">
+              <div className="lg:col-span-7 bg-brand-ivory border-3 border-brand-charcoal rounded-none p-4 md:p-6 flex flex-col justify-between shadow-[6px_6px_0px_0px_#1A1A1A]">
                 <div className="space-y-4">
                   <h2 className="font-serif font-black text-xl text-brand-charcoal flex items-center gap-2">
                     <Target className="w-5 h-5 text-brand-red" /> The Master's Feast
@@ -317,22 +365,80 @@ export default function App() {
                     <button
                       onClick={() => handleStartGame('training')}
                       id="play-feast-btn"
-                      className="w-full text-left p-5 rounded-none border-3 border-brand-charcoal bg-white hover:bg-brand-linen hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[5px_5px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-start justify-between"
+                      className="w-full text-left p-4 md:p-5 rounded-none border-3 border-brand-charcoal bg-white hover:bg-brand-linen hover:shadow-[5px_5px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex flex-col gap-3"
                     >
-                      <div className="space-y-1.5 pr-4">
-                        <span className="font-serif font-black text-lg text-brand-charcoal group-hover:text-brand-red flex items-center gap-2 transition-colors">
+                      <div className="flex items-center justify-between gap-2 w-full">
+                        <span className="font-serif font-black text-base md:text-lg text-brand-charcoal group-hover:text-brand-red flex items-center gap-1.5 transition-colors">
                           Enter Dumpling Feast 🥟🍵
                         </span>
-                        <p className="text-xs text-brand-charcoal/80 leading-relaxed font-sans">
-                          Feed the Master freshly-steamed dumplings and sip Matcha tea! Keep pesky flies off the food and drink using your chopsticks.
-                        </p>
-                      </div>
-                      <div className="h-full flex items-center">
-                        <span className="p-3 border-2 border-brand-charcoal rounded-none bg-brand-red text-white group-hover:bg-brand-charcoal transition-colors">
+                        <span className="p-2.5 md:p-3 border-2 border-brand-charcoal rounded-none bg-brand-red text-white group-hover:bg-brand-charcoal transition-colors flex-shrink-0 flex items-center justify-center">
                           <Play className="w-5 h-5 fill-current" />
                         </span>
                       </div>
+                      <p className="text-xs text-brand-charcoal/80 leading-relaxed font-sans border-t border-brand-charcoal/15 pt-2">
+                        A Zen Focus Exercise: Feed the Master freshly-steamed dumplings and sip Matcha tea! Keep pesky flies off the food and drink using your chopsticks.
+                      </p>
+                      <div className="w-full py-2.5 bg-brand-red text-white border-2 border-brand-charcoal font-serif font-black text-xs md:text-sm text-center tracking-wider uppercase group-hover:bg-brand-charcoal transition-colors shadow-[2px_2px_0px_0px_#1A1A1A] flex items-center justify-center gap-2">
+                        <Play className="w-4 h-4 fill-current" /> Start Game Now
+                      </div>
                     </button>
+                  </div>
+
+                  {/* Viewport Simulator Selector (PC / Dev Mode) */}
+                  <div className="bg-brand-linen border-2 border-brand-charcoal p-3 rounded-none space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-serif font-black text-xs text-brand-charcoal uppercase tracking-wider flex items-center gap-1.5">
+                        <Monitor className="w-3.5 h-3.5 text-brand-red" /> PC Viewport Target
+                      </span>
+                      <span className="text-[10px] font-mono bg-brand-ivory border border-brand-charcoal px-1.5 py-0.5 text-brand-charcoal font-bold">
+                        {viewportMode === 'telegram_pc' ? '370 × 574 px' : 'Full Screen'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleViewportModeChange('desktop')}
+                        id="viewport-desktop-btn"
+                        className={`p-2 border-2 border-brand-charcoal text-xs font-serif font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          viewportMode === 'desktop'
+                            ? 'bg-brand-red text-white shadow-[2px_2px_0px_0px_#1A1A1A]'
+                            : 'bg-white text-brand-charcoal hover:bg-brand-ivory'
+                        }`}
+                      >
+                        <Monitor className="w-3.5 h-3.5" /> Full Desktop
+                      </button>
+                      <button
+                        onClick={() => handleViewportModeChange('telegram_pc')}
+                        id="viewport-telegram-btn"
+                        className={`p-2 border-2 border-brand-charcoal text-xs font-serif font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          viewportMode === 'telegram_pc'
+                            ? 'bg-brand-red text-white shadow-[2px_2px_0px_0px_#1A1A1A]'
+                            : 'bg-white text-brand-charcoal hover:bg-brand-ivory'
+                        }`}
+                      >
+                        <Smartphone className="w-3.5 h-3.5" /> Telegram PC (370×574)
+                      </button>
+                  </div>
+
+                  {/* A/B Layout Tester Toggle (Luna's Fix) */}
+                  <div className="bg-brand-ivory border-2 border-brand-charcoal p-3 rounded-none flex items-center justify-between">
+                    <span className="font-serif font-black text-xs text-brand-charcoal flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Mobile Layout
+                    </span>
+                    <div className="flex border-2 border-brand-charcoal text-[10px] font-mono font-bold uppercase cursor-pointer select-none">
+                      <div 
+                        onClick={() => setLayoutMode('original')}
+                        className={`px-2 py-1 transition-colors ${layoutMode === 'original' ? 'bg-brand-charcoal text-white' : 'bg-white text-brand-charcoal hover:bg-brand-linen'}`}
+                      >
+                        Original
+                      </div>
+                      <div 
+                        onClick={() => setLayoutMode('triangular')}
+                        className={`px-2 py-1 transition-colors border-l-2 border-brand-charcoal ${layoutMode === 'triangular' ? 'bg-indigo-600 text-white' : 'bg-white text-brand-charcoal hover:bg-brand-linen'}`}
+                      >
+                        Triangular (Luna)
+                      </div>
+                    </div>
+                  </div>
                   </div>
                 </div>
 
@@ -471,8 +577,8 @@ export default function App() {
             exit={{ opacity: 0 }}
             className="flex-1 flex items-stretch justify-stretch z-10 select-none overflow-hidden relative"
           >
-            {/* Mobile Minimal HUD overlay */}
-            <div className="md:hidden absolute top-4 left-4 right-16 z-30 flex justify-between items-start pointer-events-none">
+            {/* Minimal Overlay HUD for Mobile & Telegram PC */}
+            <div className={`${viewportMode === 'telegram_pc' ? 'flex' : 'flex md:hidden'} absolute top-4 left-4 right-4 z-30 justify-between items-start pointer-events-none`}>
               <div className="flex gap-2">
                 <div className="bg-white/90 backdrop-blur-sm border-2 border-brand-charcoal px-3 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto">
                   <span className="font-serif font-black text-xl text-brand-charcoal">{stats.score}</span>
@@ -497,14 +603,15 @@ export default function App() {
                     audio.clearAllBuzzers();
                   }
                 }}
-                className="pointer-events-auto px-3 py-1 bg-white/90 hover:bg-brand-linen border-2 border-brand-charcoal font-serif font-black shadow-[2px_2px_0px_0px_#1A1A1A] text-sm text-brand-charcoal"
+                className="pointer-events-auto px-3 py-1 bg-white/90 hover:bg-brand-linen border-2 border-brand-charcoal font-serif font-black shadow-[2px_2px_0px_0px_#1A1A1A] text-sm text-brand-charcoal cursor-pointer"
               >
                 Exit
               </button>
             </div>
 
-            {/* Left HUD Stats Panel (Hidden on Mobile) */}
-            <div className="hidden md:flex w-80 bg-brand-ivory border-r-3 border-brand-charcoal p-5 flex-col justify-between z-20 shadow-none">
+            {/* Left HUD Stats Panel (Only shown in Full Desktop mode) */}
+            {viewportMode !== 'telegram_pc' && (
+              <div className="hidden md:flex w-80 bg-brand-ivory border-r-3 border-brand-charcoal p-5 flex-col justify-between z-20 shadow-none">
               {/* Top Section */}
               <div className="space-y-4">
                 {/* Header back & Pause buttons */}
@@ -637,6 +744,7 @@ export default function App() {
                 </div>
               </div>
             </div>
+            )}
 
             {/* Main Interactive High FPS Game Canvas Stage */}
             <div className="flex-1 relative bg-transparent overflow-hidden shadow-inner">
@@ -647,6 +755,7 @@ export default function App() {
                 chopstickStyleId={selectedChopstickId}
                 showHelper={showHelper}
                 soundEnabled={soundEnabled}
+                layoutMode={layoutMode}
                 onGameEnd={handleGameEnd}
                 onStatsUpdate={setStats}
               />
@@ -800,6 +909,61 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+
+  if (viewportMode === 'telegram_pc') {
+    return (
+      <div className="w-screen h-screen bg-neutral-900 flex flex-col items-center justify-center p-2 sm:p-4 overflow-hidden relative font-sans select-none">
+        {/* Background Ambiance */}
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
+          <DojoBackground showBlossoms={true} windSpeed={0.4} />
+        </div>
+
+        {/* Simulated Telegram PC Frame Container (370px x 574px) */}
+        <div className="relative w-[370px] h-[574px] bg-brand-linen border-4 border-brand-charcoal shadow-[0_25px_60px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden rounded-md z-10">
+          {/* Telegram PC Frame Header */}
+          <div className="bg-brand-charcoal text-brand-linen px-3 py-1.5 flex items-center justify-between text-xs font-serif font-bold flex-shrink-0 z-50">
+            <span className="flex items-center gap-1.5 text-[11px] font-mono tracking-tight text-white">
+              <Smartphone className="w-3.5 h-3.5 text-brand-red" /> Telegram Mini App (370×574)
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className="p-1 text-white/80 hover:text-white transition-colors cursor-pointer"
+                title={soundEnabled ? 'Mute Audio' : 'Unmute Audio'}
+              >
+                {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5 text-brand-red" />}
+              </button>
+              <button
+                onClick={() => setShowSettings(true)}
+                className="p-1 text-white/80 hover:text-white transition-colors cursor-pointer"
+                title="Dojo Settings"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => handleViewportModeChange('desktop')}
+                className="text-[10px] font-mono bg-brand-red hover:bg-brand-red/80 text-white px-2 py-0.5 rounded-none flex items-center gap-1 transition-all cursor-pointer ml-1"
+                title="Switch to Full Desktop Mode"
+              >
+                <Monitor className="w-3 h-3" /> Full Desktop
+              </button>
+            </div>
+          </div>
+
+          {/* Inner Playable Canvas Container */}
+          <div className="relative flex-1 w-full h-full overflow-hidden flex flex-col">
+            {appCoreContent}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-screen h-screen overflow-hidden bg-brand-linen flex flex-col font-sans select-none">
+      {appCoreContent}
     </div>
   );
 }

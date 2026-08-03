@@ -22,6 +22,7 @@ interface GameCanvasProps {
   chopstickStyleId: string;
   showHelper: boolean;
   soundEnabled: boolean;
+  layoutMode?: 'original' | 'triangular';
   onGameEnd: (stats: GameStats) => void;
   onStatsUpdate: (stats: GameStats) => void;
 }
@@ -33,6 +34,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   chopstickStyleId,
   showHelper,
   soundEnabled,
+  layoutMode = 'original',
   onGameEnd,
   onStatsUpdate,
 }) => {
@@ -457,7 +459,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const comboText = comboMult > 1 ? ` (x${comboMult} Combo!)` : '';
     addFloatingText(fly.x, fly.y - 15, `Safely Released! 🌸 +${pointEarned}p${comboText}`, '#10b981');
 
-    // Trigger Sounds
+    // Trigger Sounds & Haptics
     if (soundEnabled) {
       if (fly.type === 'golden') {
         audio.playCatch('rare');
@@ -468,6 +470,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         audio.playCatch('standard');
       }
     }
+    
+    // Telegram Native Haptic Feedback
+    try {
+      if (window.Telegram?.WebApp?.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+      }
+    } catch(e) {}
     
     // Refresh Scoreboards in parent
     stats.accuracy = Math.round((stats.fliesCaught / Math.max(1, stats.totalAttempts)) * 100);
@@ -490,23 +499,41 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       canvas.width = w;
       canvas.height = h;
 
-      // Update Matcha Tea Cup position (Left side of canvas)
-      teaRef.current.x = Math.max(90, w * 0.18);
-      teaRef.current.y = h * 0.68;
-      teaRef.current.origX = Math.max(90, w * 0.18);
-      teaRef.current.origY = h * 0.68;
+      // Apply Triangular Layout logic for small screens if requested
+      if (w < 500 && layoutMode === 'triangular') {
+        // Master Mouth top-right
+        mouthRef.current.x = w - 80;
+        mouthRef.current.y = h * 0.40;
+        
+        // Matcha Cup top-left
+        teaRef.current.x = 80;
+        teaRef.current.y = h * 0.40;
+        teaRef.current.origX = 80;
+        teaRef.current.origY = h * 0.40;
+        
+        // Plate bottom-center
+        plateRef.current.x = w * 0.50;
+        plateRef.current.y = h * 0.75;
+        
+        // Release Window (keep top-center)
+        releaseWindowRef.current.x = w * 0.50;
+        releaseWindowRef.current.y = Math.max(65, h * 0.12);
+      } else {
+        // Original layout (Locked to horizontal plane)
+        teaRef.current.x = Math.max(90, w * 0.18);
+        teaRef.current.y = h * 0.68;
+        teaRef.current.origX = Math.max(90, w * 0.18);
+        teaRef.current.origY = h * 0.68;
 
-      // Update Dumpling Plate position (Center of canvas)
-      plateRef.current.x = w * 0.50;
-      plateRef.current.y = h * 0.70;
+        plateRef.current.x = w * 0.50;
+        plateRef.current.y = h * 0.70;
 
-      // Update Target Mouth position (Right side of canvas)
-      mouthRef.current.x = Math.min(w - 90, w * 0.82);
-      mouthRef.current.y = h * 0.65;
+        mouthRef.current.x = Math.min(w - 90, w * 0.82);
+        mouthRef.current.y = h * 0.65;
 
-      // Update Release Window position (Top center of canvas)
-      releaseWindowRef.current.x = w * 0.50;
-      releaseWindowRef.current.y = Math.max(65, h * 0.14);
+        releaseWindowRef.current.x = w * 0.50;
+        releaseWindowRef.current.y = Math.max(65, h * 0.14);
+      }
 
       // Re-position active dumplings relative to the plate center
       if (dumplingsRef.current.length > 0) {
@@ -531,6 +558,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     (window as any).onResize = handleResize;
     window.addEventListener('resize', handleResize);
+
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    if (canvas.parentElement) {
+      resizeObserver.observe(canvas.parentElement);
+    }
+
     handleResize();
 
     // Spawn 3 initial flies
@@ -1647,6 +1682,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
 
     return () => {
+      resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animFrameId);
       audio.stopFlybyNarration();
@@ -1891,7 +1927,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   };
 
-  const handleMouseUp = (e: React.MouseEvent) => {
+  const handleDropOrRelease = () => {
     if (!isPlaying) return;
 
     if (dragItemRef.current) {
@@ -1963,6 +1999,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   };
 
+  const handleMouseUp = (e: React.MouseEvent) => handleDropOrRelease();
+
   // Touch handlers for mobile players (Tap-to-Catch)
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!isPlaying || e.touches.length === 0) return;
@@ -1977,6 +2015,32 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     createSparkles(touchX, touchY, 'rgba(255, 255, 255, 0.95)', 8);
 
     if (isMobileOrTouchDevice()) {
+      // 1. Check if touching a Dumpling
+      const dumplings = dumplingsRef.current;
+      for (let i = 0; i < dumplings.length; i++) {
+        const d = dumplings[i];
+        if (!d.isEaten && getDistance(touchX, touchY, d.x, d.y) <= 40) {
+          if (!d.isBlockedByFly) {
+            dragItemRef.current = { type: 'dumpling', id: d.id, index: i, startX: touchX, startY: touchY };
+            mouseRef.current.x = touchX;
+            mouseRef.current.y = touchY;
+            return;
+          }
+        }
+      }
+
+      // 2. Check if touching Soda Tumbler/Tea
+      const tea = teaRef.current;
+      if (getDistance(touchX, touchY, tea.x, tea.y) <= 55) {
+        if (!tea.isBlockedByFly) {
+          dragItemRef.current = { type: 'tea', startX: touchX, startY: touchY };
+          mouseRef.current.x = touchX;
+          mouseRef.current.y = touchY;
+          return;
+        }
+      }
+
+      // 3. Otherwise try to catch a fly
       // If chopsticks are currently carrying out an auto capture sequence, block tap
       if (autoCaptureRef.current?.active) return;
 
@@ -2012,13 +2076,26 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isPlaying || e.touches.length === 0) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const mx = touch.clientX - rect.left;
+    const my = touch.clientY - rect.top;
+
     if (!isMobileOrTouchDevice()) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const touch = e.touches[0];
-      mouseRef.current.x = touch.clientX - rect.left;
-      mouseRef.current.y = touch.clientY - rect.top;
+      mouseRef.current.x = mx;
+      mouseRef.current.y = my;
+    } else {
+      if (dragItemRef.current) {
+        mouseRef.current.x = mx;
+        mouseRef.current.y = my;
+        
+        // Open mouth visual feedback when dragging near mouth
+        const mouth = mouthRef.current;
+        const dist = getDistance(mx, my, mouth.x, mouth.y);
+        mouth.isOpen = dist <= mouth.radius + 25;
+      }
     }
   };
 
@@ -2026,6 +2103,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     if (!isPlaying) return;
     if (!isMobileOrTouchDevice()) {
       handleReleasePinch();
+    } else {
+      if (dragItemRef.current) {
+        handleDropOrRelease();
+      }
     }
   };
 
@@ -2178,6 +2259,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       onMouseMove={handleMouseMove}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      onMouseLeave={handleDropOrRelease}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}

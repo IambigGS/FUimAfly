@@ -1,3 +1,5 @@
+/// <reference types="vite/client" />
+
 export type GameMode = 'arcade' | 'zen' | 'training';
 
 export type FlyType = 'housefly' | 'bluebottle' | 'fruitfly' | 'golden' | 'ninja';
@@ -110,6 +112,14 @@ declare global {
       WebApp?: {
         ready: () => void;
         expand: () => void;
+        requestFullscreen?: () => void;
+        HapticFeedback?: {
+          impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
+          notificationOccurred: (type: 'error' | 'success' | 'warning') => void;
+          selectionChanged: () => void;
+        };
+        onEvent?: (eventType: string, callback: () => void) => void;
+        viewportHeight?: number;
         setHeaderColor?: (color: string) => void;
         setBackgroundColor?: (color: string) => void;
         platform?: string;
