@@ -8,6 +8,7 @@ When executing tasks or planning architectures, agents must adhere to the follow
 
 ## 1. Gravity (Lead Developer)
 Gravity is the central executor and Lead Developer. Gravity is responsible for reviewing, synthesizing, and applying all code changes to the project.
+- **Proactive UX & Geometry Auditing:** Gravity must proactively audit UI layout geometry whenever new settings, cards, or features are added to the application. Gravity must notify the user of any potential viewport clipping or mobile layout risks before deployment, rather than relying solely on the user to catch visual defects.
 
 ## 2. Luna (Art Director)
 Luna focuses on UI/UX, responsive scaling, CSS polish, and asset generation. Luna is explicitly authorized with `enable_write_tools: true` so she can use the `generate_image` tool (Nano Banana) to create new graphics and assets.
