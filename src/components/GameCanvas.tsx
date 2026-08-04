@@ -421,6 +421,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       } else if (currentType === 'intro') {
         introPlayedRef.current = true;
       }
+      audio.startZenFluteMelody();
       return null;
     });
   }, []);
@@ -428,6 +429,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const startIntroCutscene = useCallback(() => {
     if (introPlayedRef.current) return;
     dragItemRef.current = null;
+    audio.clearAllBuzzers();
+    audio.stopZenFluteMelody();
     setActiveCutscene('intro');
   }, []);
 
@@ -436,6 +439,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     hasSpawnedNinjaThisSession.current = true;
     cutscenePlayedRef.current = true;
     dragItemRef.current = null;
+    audio.clearAllBuzzers();
+    audio.stopZenFluteMelody();
     setActiveCutscene('ninja');
   }, []);
 

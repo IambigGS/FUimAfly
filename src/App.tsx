@@ -105,6 +105,16 @@ export default function App() {
 
   // Load Highscores on Mount
   useEffect(() => {
+    const handleFirstGesture = () => {
+      audio.resume();
+      window.removeEventListener('pointerdown', handleFirstGesture);
+      window.removeEventListener('touchstart', handleFirstGesture);
+      window.removeEventListener('click', handleFirstGesture);
+    };
+    window.addEventListener('pointerdown', handleFirstGesture);
+    window.addEventListener('touchstart', handleFirstGesture);
+    window.addEventListener('click', handleFirstGesture);
+
     try {
       const storedArcadeScore = localStorage.getItem('chop_arcade_score');
       if (storedArcadeScore) setArcadeHighScore(parseInt(storedArcadeScore, 10));
