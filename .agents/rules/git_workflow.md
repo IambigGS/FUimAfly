@@ -7,3 +7,7 @@
 2. **Automated CI/CD Deployment**:
    - Pushing to `main` automatically triggers the GitHub Actions workflow defined in `.github/workflows/deploy.yml`.
    - The workflow builds the production bundle and deploys it to the `gh-pages` branch for live hosting.
+
+3. **GitHub Pages Source Setting**:
+   - GitHub Repository Settings > Pages MUST remain configured to **Source: Deploy from a branch** -> **Branch: `gh-pages` / `/ (root)`**.
+   - Do NOT point GitHub Pages directly to `main`, because `main` contains uncompiled React/TypeScript source files, whereas `gh-pages` contains the ready-to-run production build.
