@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Echo's Audio Pitch Presentation — X-Ray Contributions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --accent-gold: #f59e0b;
+      --accent-teal: #14b8a6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header {
+      width: 100%;
+      max-width: 900px;
+      padding: 2.5rem 1.5rem 1rem 1.5rem;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.35rem 0.85rem;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-gold);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+    h1 {
+      margin: 0 0 0.5rem 0;
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #d97706 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p.subtitle {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      line-height: 1.5;
+    }
+    .container {
+      width: 100%;
+      max-width: 900px;
+      padding: 1.5rem;
+      box-sizing: border-box;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0 0 0.25rem 0;
+    }
+    .time-code {
+      font-size: 0.8rem;
+      font-family: monospace;
+      color: var(--accent-teal);
+      background: rgba(20, 184, 166, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+    .card-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .tag {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #cbd5e1;
+    }
+    audio {
+      width: 100%;
+      border-radius: 8px;
+      outline: none;
+    }
+    footer {
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">ECHO'S AUDIO PITCH PRESENTATION</div>
+    <h1>X-Ray Contributions Concept Showcase</h1>
+    <p class="subtitle">Extracted & Sliced directly from <code>Fly-ish.mp3</code> (Ignoring MP4 per directive). Browse and preview Echo's proposed sound motifs below!</p>
+  </header>
+
+  <div class="container">
+
+    <!-- Concept 1 -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">1. Acoustic Hurdy-Gurdy Drone Intro</h2>
+          <span class="time-code">Source: 00:00 - 00:12 (12.5s)</span>
+        </div>
+      </div>
+      <p class="card-desc">Rich, buzzing medieval hurdy-gurdy drone with steady acoustic rhythmic strumming. Proposed for Level 3 Garden/Ninja fly stage intro motif or stage selection screen.</p>
+      <div class="tags">
+        <span class="tag">Background Music</span>
+        <span class="tag">Garden Theme</span>
+        <span class="tag">Acoustic Drone</span>
+      </div>
+      <audio controls src="echo_concept_01_hurdy_gurdy_intro.mp3"></audio>
+    </div>
+
+    <!-- Concept 2 -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">2. Rhythmic Fly-Buzz Strumming</h2>
+          <span class="time-code">Source: 00:12 - 00:27 (15.0s)</span>
+        </div>
+      </div>
+      <p class="card-desc">Driving rhythmic acoustic progression with a natural fly-like overtone resonance. Proposed for mid-game momentum, speed-up phases, or Golden Frenzy mode.</p>
+      <div class="tags">
+        <span class="tag">Golden Frenzy</span>
+        <span class="tag">High Energy</span>
+        <span class="tag">Rhythmic Motifs</span>
+      </div>
+      <audio controls src="echo_concept_02_rhythmic_fly_buzz_strum.mp3"></audio>
+    </div>
+
+    <!-- Concept 3 -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">3. Melodic Flight & Pitch Bends</h2>
+          <span class="time-code">Source: 00:27 - 00:41 (14.0s)</span>
+        </div>
+      </div>
+      <p class="card-desc">Playful string bends mimicking a fly swooping up and down in pitch. Excellent candidate for specialized fly flight paths or maneuver sound triggers.</p>
+      <div class="tags">
+        <span class="tag">Fly Movement</span>
+        <span class="tag">Pitch Bends</span>
+        <span class="tag">Playful SFX</span>
+      </div>
+      <audio controls src="echo_concept_03_melodic_fly_flight.mp3"></audio>
+    </div>
+
+    <!-- Concept 4 -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">4. Percussive Wood-Body Taps</h2>
+          <span class="time-code">Source: 00:41 - 00:53 (12.0s)</span>
+        </div>
+      </div>
+      <p class="card-desc">Percussive guitar body strikes reminiscent of wooden chopsticks clacking against tea tables. Can be used for UI menu clicks or chopstick strike feedback.</p>
+      <div class="tags">
+        <span class="tag">UI Feedback</span>
+        <span class="tag">Chopstick Clack</span>
+        <span class="tag">Percussion</span>
+      </div>
+      <audio controls src="echo_concept_04_percussive_taps.mp3"></audio>
+    </div>
+
+    <!-- Concept 5 -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">5. Hurdy-Gurdy Frenzy Climax</h2>
+          <span class="time-code">Source: 00:53 - 01:11 (18.0s)</span>
+        </div>
+      </div>
+      <p class="card-desc">Full-bodied harmonic acoustic climax with rapid buzzing overtones. Ideal victory theme for level completion or high score reward screens.</p>
+      <div class="tags">
+        <span class="tag">Victory Theme</span>
+        <span class="tag">Level Complete</span>
+        <span class="tag">Full Ensemble</span>
+      </div>
+      <audio controls src="echo_concept_05_hurdy_gurdy_climax.mp3"></audio>
+    </div>
+
+    <!-- Concept 6 -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">6. Resonant Outro & Peaceful Fade</h2>
+          <span class="time-code">Source: 01:11 - 01:32 (21.5s)</span>
+        </div>
+      </div>
+      <p class="card-desc">Gently fading acoustic resonance that dies down smoothly like a sleepy fly settling onto a teacup after a long day.</p>
+      <div class="tags">
+        <span class="tag">Outro</span>
+        <span class="tag">Teacup Rest</span>
+        <span class="tag">Peaceful Fade</span>
+      </div>
+      <audio controls src="echo_concept_06_outro_fade_buzz.mp3"></audio>
+    </div>
+
+  </div>
+
+  <footer>
+    <p>Prepared by <strong>Echo & Gravity</strong> — FUimAfly Audio Studio</p>
+  </footer>
+
+</body>
+</html>

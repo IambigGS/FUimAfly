@@ -540,6 +540,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // Trigger Sounds & Haptics
     if (soundEnabled) {
+      audio.playSfx('escape');
       if (fly.type === 'golden') {
         audio.playCatch('rare');
         triggerFrenzy();
@@ -1969,6 +1970,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       stats.combo = 0;
       if (soundEnabled) {
         audio.playClack();
+        audio.playSfx(Math.random() > 0.5 ? 'complain' : 'escape');
       }
       
       // Floating miss indicator
@@ -2005,6 +2007,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
           if (soundEnabled) {
             audio.playClack();
+            audio.playSfx('escape');
           }
 
           addFloatingText(fly.x, fly.y - 15, 'Let go! 💨', '#a8a29e');
@@ -2085,7 +2088,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       if (nearbyFly) {
         if (nearbyFly.type === 'ninja' && nearbyFly.isCatchable === false) {
-          audio.playClack();
+          if (soundEnabled) {
+            audio.playClack();
+            audio.playSfx('escape');
+          }
           addFloatingText(mx, my, "Too Fast! ⚡", "#a855f7");
         } else {
           autoCaptureRef.current = {
@@ -2098,7 +2104,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           };
         }
       } else {
-        audio.playClack();
+        if (soundEnabled) {
+          audio.playClack();
+          audio.playSfx('complain');
+        }
         addFloatingText(mx, my, "Miss!", "rgba(200, 180, 140, 0.7)");
       }
       return;
@@ -2324,7 +2333,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       if (nearbyFly) {
         if (nearbyFly.type === 'ninja' && nearbyFly.isCatchable === false) {
-          audio.playClack();
+          if (soundEnabled) {
+            audio.playClack();
+            audio.playSfx('escape');
+          }
           addFloatingText(touchX, touchY, "Too Fast! ⚡", "#a855f7");
         } else {
           autoCaptureRef.current = {
@@ -2337,7 +2349,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           };
         }
       } else {
-        audio.playClack();
+        if (soundEnabled) {
+          audio.playClack();
+          audio.playSfx('complain');
+        }
         addFloatingText(touchX, touchY, "Miss!", "rgba(200, 180, 140, 0.7)");
       }
     } else {

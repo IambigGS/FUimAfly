@@ -296,9 +296,26 @@ class AudioEngine {
   }
 
   // Play general retro arcade sounds
-  playSfx(effect: 'time-warning' | 'game-over' | 'frenzy' | 'levelup') {
+  playSfx(effect: 'time-warning' | 'game-over' | 'frenzy' | 'levelup' | 'escape' | 'ouch' | 'sputter' | 'complain') {
     this.resume();
     if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+
+    if (effect === 'escape') {
+      this.playFlyEscape();
+      return;
+    }
+    if (effect === 'ouch') {
+      this.playFlyOuch();
+      return;
+    }
+    if (effect === 'sputter') {
+      this.playSputteringEngine();
+      return;
+    }
+    if (effect === 'complain') {
+      this.playFlyComplaining();
+      return;
+    }
 
     const ctx = this.ctx;
     const now = ctx.currentTime;
@@ -416,6 +433,151 @@ class AudioEngine {
     osc.start(now);
     osc.stop(now + 0.2);
   }
+
+  // --- ECHO'S PROCEDURAL COMEDY AUDIO FUNCTIONS ---
+
+  playFlyEscape() {
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    
+    // The "Bzz-Boing"
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.exponentialRampToValueAtTime(800, now + 0.15); // Fast sweep up
+
+    // LFO for tight buzz modulation
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(40, now);
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.setValueAtTime(50, now); // modulation depth
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    lfo.start(now);
+    osc.start(now);
+    lfo.stop(now + 0.25);
+    osc.stop(now + 0.25);
+  }
+
+  playFlyOuch() {
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    
+    // The "Bzz-Oof" (Squeaky voice formant)
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1200, now); // High formant
+    filter.Q.setValueAtTime(5, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  playSputteringEngine() {
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    // The failing biplane engine
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, now);
+    osc.frequency.linearRampToValueAtTime(40, now + 0.8);
+
+    const am = ctx.createOscillator();
+    am.type = 'square';
+    am.frequency.setValueAtTime(15, now); // Initial stutter speed
+    am.frequency.linearRampToValueAtTime(2, now + 0.8); // Sputtering out
+
+    const amGain = ctx.createGain();
+    amGain.gain.setValueAtTime(1, now);
+    am.connect(amGain.gain);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1000, now);
+    filter.frequency.linearRampToValueAtTime(200, now + 0.8);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.8);
+
+    osc.connect(amGain);
+    amGain.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+
+    am.start(now);
+    osc.start(now);
+    am.stop(now + 0.85);
+    osc.stop(now + 0.85);
+  }
+
+  playFlyComplaining() {
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    // Animal Crossing style mumbling
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    
+    // Step sequencer for pitch
+    let time = now;
+    for(let i=0; i<6; i++) {
+      const pitch = 600 + Math.random() * 800; // High pitched gibberish
+      osc.frequency.setValueAtTime(pitch, time);
+      time += 0.05 + Math.random() * 0.05;
+    }
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(3000, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.15, now + 0.05);
+    gain.gain.setValueAtTime(0.15, time - 0.05);
+    gain.gain.linearRampToValueAtTime(0.01, time);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    osc.start(now);
+    osc.stop(time);
+  }
+
+  // ------------------------------------------------
 
   private getBuffersForCategory(category: 'flying' | 'landed_drink' | 'landed_dumpling' | 'captured'): AudioBuffer[] {
     switch (category) {
