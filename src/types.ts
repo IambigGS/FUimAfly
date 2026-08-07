@@ -106,6 +106,23 @@ export interface GameStats {
   sipNeeded: boolean;
 }
 
+export interface PlaytestLog {
+  timestamp: string;
+  sessionDurationSec: number;
+  timeRemainingSec: number;
+  totalPinches: number;
+  successfulCatches: number;
+  missedAttempts: number;
+  accuracyPercentage: number;
+  catchesByType: Record<FlyType, number>;
+  frenzyTriggers: number;
+  maxCombo: number;
+  feastDamageTaken: number;
+  averageTimeBetweenCatchesSec: number;
+  difficulty: string;
+  viewportMode: string;
+}
+
 declare global {
   interface Window {
     Telegram?: {

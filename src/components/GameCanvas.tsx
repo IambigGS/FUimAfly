@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Fly, FlyType, Particle, GameStats, ChopstickConfig } from '../types';
+import { Fly, FlyType, Particle, GameStats, ChopstickConfig, PlaytestLog } from '../types';
 import { audio, getAssetUrl } from '../utils/audio';
 import { CHOPSTICK_STYLES } from './SettingsModal';
 import { Capacitor } from '@capacitor/core';
@@ -24,6 +24,8 @@ interface GameCanvasProps {
   soundEnabled: boolean;
   layoutMode?: 'original' | 'triangular';
   simulateTouch?: boolean;
+  isPlaytestMode?: boolean;
+  onPlaytestComplete?: (log: PlaytestLog) => void;
   onGameEnd: (stats: GameStats) => void;
   onStatsUpdate: (stats: GameStats) => void;
 }
@@ -37,6 +39,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   soundEnabled,
   layoutMode = 'triangular',
   simulateTouch = false,
+  isPlaytestMode = false,
+  onPlaytestComplete,
   onGameEnd,
   onStatsUpdate,
 }) => {
@@ -72,6 +76,94 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const particlesRef = useRef<Particle[]>([]);
   const floatingTextsRef = useRef<{ id: string; x: number; y: number; text: string; color: string; life: number; maxLife: number }[]>([]);
   const timeScaleRef = useRef(1.0);
+
+  // Telemetry ref for Sid & Scott 3-minute playtest session analysis
+  const [playtestTimer, setPlaytestTimer] = useState(180);
+  const telemetryRef = useRef({
+    startTime: 0,
+    totalPinches: 0,
+    successfulCatches: 0,
+    missedAttempts: 0,
+    catchesByType: { fruitfly: 0, housefly: 0, bluebottle: 0, ninja: 0, golden: 0 } as Record<FlyType, number>,
+    frenzyTriggers: 0,
+    maxCombo: 0,
+    feastDamageTaken: 0,
+    catchTimestamps: [] as number[],
+  });
+
+  useEffect(() => {
+    if (!isPlaying || !isPlaytestMode) return;
+
+    telemetryRef.current = {
+      startTime: Date.now(),
+      totalPinches: 0,
+      successfulCatches: 0,
+      missedAttempts: 0,
+      catchesByType: { fruitfly: 0, housefly: 0, bluebottle: 0, ninja: 0, golden: 0 },
+      frenzyTriggers: 0,
+      maxCombo: 0,
+      feastDamageTaken: 0,
+      catchTimestamps: [],
+    };
+    setPlaytestTimer(180);
+
+    const interval = setInterval(() => {
+      setPlaytestTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          finishPlaytestSession();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, isPlaytestMode]);
+
+  const finishPlaytestSession = useCallback(() => {
+    const sessionDurationSec = Math.max(1, Math.round((Date.now() - telemetryRef.current.startTime) / 1000));
+    const totalPinches = telemetryRef.current.totalPinches;
+    const successfulCatches = telemetryRef.current.successfulCatches;
+    const missedAttempts = Math.max(0, totalPinches - successfulCatches);
+    const accuracyPercentage = totalPinches > 0 ? Math.round((successfulCatches / totalPinches) * 100) : 0;
+
+    let averageTimeBetweenCatchesSec = 0;
+    const ts = telemetryRef.current.catchTimestamps;
+    if (ts.length > 1) {
+      let totalDiff = 0;
+      for (let i = 1; i < ts.length; i++) {
+        totalDiff += (ts[i] - ts[i - 1]) / 1000;
+      }
+      averageTimeBetweenCatchesSec = Math.round((totalDiff / (ts.length - 1)) * 10) / 10;
+    }
+
+    const log: PlaytestLog = {
+      timestamp: new Date().toISOString(),
+      sessionDurationSec,
+      timeRemainingSec: playtestTimer,
+      totalPinches,
+      successfulCatches,
+      missedAttempts,
+      accuracyPercentage,
+      catchesByType: telemetryRef.current.catchesByType,
+      frenzyTriggers: telemetryRef.current.frenzyTriggers,
+      maxCombo: telemetryRef.current.maxCombo,
+      feastDamageTaken: telemetryRef.current.feastDamageTaken,
+      averageTimeBetweenCatchesSec,
+      difficulty,
+      viewportMode: layoutMode || 'desktop',
+    };
+
+    try {
+      (window as any).__LAST_PLAYTEST_LOG__ = log;
+      localStorage.setItem('last_playtest_log', JSON.stringify(log));
+    } catch {}
+
+    if (onPlaytestComplete) {
+      onPlaytestComplete(log);
+    }
+  }, [playtestTimer, difficulty, layoutMode, onPlaytestComplete]);
 
   const setFlyCatchable = (flyId: string, catchable: boolean) => {
     fliesRef.current = fliesRef.current.map((f) => {
@@ -269,16 +361,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const spawnTimerRef = useRef<number | null>(null);
   const secondTimerRef = useRef<number | null>(null);
 
-  // Difficulty settings
+  // Difficulty settings (Sid & Scott Gameplay Overhaul)
   const getDifficultySettings = () => {
     switch (difficulty) {
       case 'easy':
-        return { hitRadius: 28, flySpeedMult: 0.7, escapeDist: 90 };
+        return { hitRadius: 40, snapRadius: 85, flySpeedMult: 0.75, escapeDist: 80 };
       case 'hard':
-        return { hitRadius: 15, flySpeedMult: 1.45, escapeDist: 160 };
+        return { hitRadius: 26, snapRadius: 60, flySpeedMult: 1.15, escapeDist: 130 };
       case 'normal':
       default:
-        return { hitRadius: 22, flySpeedMult: 1.0, escapeDist: 125 };
+        return { hitRadius: 34, snapRadius: 75, flySpeedMult: 0.85, escapeDist: 100 };
     }
   };
 
@@ -543,8 +635,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       stats.maxCombo = stats.combo;
     }
 
-    // Combo Multiplier logic
-    const comboMult = Math.min(5, Math.ceil(stats.combo / 4));
+    // Telemetry capture tracking
+    telemetryRef.current.successfulCatches++;
+    telemetryRef.current.catchesByType[fly.type] = (telemetryRef.current.catchesByType[fly.type] || 0) + 1;
+    telemetryRef.current.catchTimestamps.push(Date.now());
+    if (stats.combo > telemetryRef.current.maxCombo) {
+      telemetryRef.current.maxCombo = stats.combo;
+    }
+
+    // Combo Multiplier logic (Sid & Scott Overhaul: unlocks every 2 catches!)
+    const comboMult = Math.min(5, Math.ceil(stats.combo / 2));
     const pointEarned = fly.points * comboMult;
     stats.score += pointEarned;
 
@@ -1961,19 +2061,58 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       return; // Ignore the input completely!
     }
 
-    // Find first fly within hit bounds
+    // Adaptive Miss Hitbox Expansion (Sid & Scott DDA)
+    const consecutiveMisses = telemetryRef.current.missedAttempts;
+    const missMultiplier = 1.0 + Math.min(0.50, consecutiveMisses * 0.10); // +10% per miss up to +50%
+    const effectiveStrikeRadius = diffSettings.hitRadius * missMultiplier;
+    const snapRadius = diffSettings.snapRadius || 75;
+
+    // 1. Direct Hit check
     for (let i = 0; i < flies.length; i++) {
       const fly = flies[i];
       if (!fly.isCaught && fly.state !== 'releasing') {
         const dist = getDistance(hitX, hitY, fly.x, fly.y);
-        if (dist <= strikeRadius) {
+        if (dist <= effectiveStrikeRadius) {
           caughtFlyIndex = i;
-          break; // Grab the first one
+          break; // Direct hit!
+        }
+      }
+    }
+
+    // 2. Magnetic Snap check (if no direct hit)
+    if (caughtFlyIndex === -1) {
+      for (let i = 0; i < flies.length; i++) {
+        const fly = flies[i];
+        if (!fly.isCaught && fly.state !== 'releasing') {
+          const dist = getDistance(hitX, hitY, fly.x, fly.y);
+          if (dist <= snapRadius) {
+            caughtFlyIndex = i;
+            // Magnetic snap effect: snap fly position directly to chopsticks!
+            fly.x = hitX * 0.75 + fly.x * 0.25;
+            fly.y = hitY * 0.75 + fly.y * 0.25;
+            break;
+          }
+        }
+      }
+    }
+
+    // Check for Near-Miss (within 100px) to reward player with Near-Miss Frenzy Charge & Text
+    let isNearMiss = false;
+    if (caughtFlyIndex === -1) {
+      for (let i = 0; i < flies.length; i++) {
+        const fly = flies[i];
+        if (!fly.isCaught && fly.state !== 'releasing') {
+          const dist = getDistance(hitX, hitY, fly.x, fly.y);
+          if (dist <= 105) {
+            isNearMiss = true;
+            break;
+          }
         }
       }
     }
 
     stats.totalAttempts++;
+    telemetryRef.current.totalPinches++;
 
     if (caughtFlyIndex !== -1) {
       const fly = flies[caughtFlyIndex];
@@ -1997,8 +2136,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // Sparkle Splashes
-      createCaptureParticles(fly.x, fly.y, fly.color, 10);
-      createCaptureParticles(fly.x, fly.y, 'rgba(255, 255, 255, 0.8)', 5);
+      createCaptureParticles(fly.x, fly.y, fly.color, 12);
+      createCaptureParticles(fly.x, fly.y, 'rgba(255, 255, 255, 0.9)', 8);
 
       // Trigger crisp capture clack
       if (soundEnabled) {
@@ -2010,13 +2149,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     } else {
       // Strike Miss
       stats.combo = 0;
-      if (soundEnabled) {
-        audio.playClack();
-        audio.playSfx(Math.random() > 0.5 ? 'complain' : 'escape');
+      telemetryRef.current.missedAttempts++;
+
+      if (isNearMiss) {
+        // Near-Miss Dopamine Hook!
+        telemetryRef.current.frenzyTriggers += 0.2;
+        addFloatingText(hitX, hitY - 20, 'SO CLOSE! ⚡', '#06b6d4');
+        if (soundEnabled) audio.playClack();
+      } else {
+        if (soundEnabled) {
+          audio.playClack();
+          audio.playSfx(Math.random() > 0.5 ? 'complain' : 'escape');
+        }
+        addFloatingText(hitX, hitY - 15, 'Clack!', '#a8a29e');
       }
-      
-      // Floating miss indicator
-      addFloatingText(hitX, hitY - 15, 'Clack!', '#a8a29e');
     }
 
     // Refresh Scoreboards in React parent
@@ -2649,6 +2795,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           <div className="absolute bottom-6 right-6 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-md border border-white/30 animate-pulse pointer-events-none z-50">
             Tap anywhere to skip ⏩
           </div>
+        </div>
+      )}
+
+      {/* In-Game 3-Minute Playtest Logging HUD Indicator */}
+      {isPlaytestMode && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-brand-charcoal/95 text-white border-2 border-brand-red px-5 py-2 rounded-full backdrop-blur-md shadow-2xl flex items-center gap-3 font-mono text-xs font-bold tracking-wider pointer-events-none">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-red opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-brand-red"></span>
+          </span>
+          <span className="text-brand-ivory font-serif">PLAYTEST LOGGING:</span>
+          <span className="text-yellow-400 font-mono text-sm">
+            {Math.floor(playtestTimer / 60).toString().padStart(2, '0')}:{(playtestTimer % 60).toString().padStart(2, '0')}
+          </span>
         </div>
       )}
 

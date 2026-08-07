@@ -29,12 +29,17 @@ import { GameCanvas } from './components/GameCanvas';
 import { HowToPlay } from './components/HowToPlay';
 import { SettingsModal, CHOPSTICK_STYLES } from './components/SettingsModal';
 import { audio } from './utils/audio';
-import { GameMode, GameStats, FlyType } from './types';
+import { GameMode, GameStats, FlyType, PlaytestLog } from './types';
 
 export default function App() {
   // Navigation & Screens
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover'>('menu');
   const [gameMode, setGameMode] = useState<GameMode>('arcade');
+
+  // Playtest Telemetry System (for Sid & Scott)
+  const [isPlaytestMode, setIsPlaytestMode] = useState(false);
+  const [playtestLog, setPlaytestLog] = useState<PlaytestLog | null>(null);
+  const [showPlaytestModal, setShowPlaytestModal] = useState(false);
 
   // Popups & Overlays
   const [showTutorial, setShowTutorial] = useState(false);
@@ -202,6 +207,7 @@ export default function App() {
     } catch (e) {}
 
     setGameMode(mode);
+    setIsPlaytestMode(false);
     setGameState('playing');
     // Reset stats
     setStats({
@@ -218,6 +224,33 @@ export default function App() {
       dumplingsEatenThisLevel: 0,
       sipNeeded: false,
     });
+  };
+
+  const handleStartPlaytestSession = () => {
+    setIsPlaytestMode(true);
+    setGameMode('arcade');
+    setGameState('playing');
+    setStats({
+      score: 0,
+      fliesCaught: 0,
+      totalAttempts: 0,
+      accuracy: 100,
+      combo: 0,
+      maxCombo: 0,
+      gameTimeRemaining: 180,
+      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
+      level: 1,
+      dumplingsLeft: 5,
+      dumplingsEatenThisLevel: 0,
+      sipNeeded: false,
+    });
+  };
+
+  const handlePlaytestComplete = (log: PlaytestLog) => {
+    setPlaytestLog(log);
+    setShowPlaytestModal(true);
+    setGameState('menu');
+    setIsPlaytestMode(false);
   };
 
   // Exit/End the game session
@@ -450,6 +483,16 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Sid & Scott Telemetry Playtest Launcher */}
+                  <button
+                    onClick={handleStartPlaytestSession}
+                    id="start-playtest-btn"
+                    className="w-full p-3 bg-brand-charcoal hover:bg-brand-red text-white border-2 border-brand-charcoal font-serif font-black text-xs md:text-sm tracking-wider uppercase transition-all duration-150 shadow-[3px_3px_0px_0px_#C83232] cursor-pointer flex items-center justify-center gap-2 group"
+                  >
+                    <Sparkles className="w-4 h-4 text-yellow-400 group-hover:scale-110 transition-transform" />
+                    <span>🧪 Start 3-Min Playtest Session (Sid & Scott Log)</span>
+                  </button>
+
 
                   </div>
                 </div>
@@ -648,6 +691,8 @@ export default function App() {
                 soundEnabled={soundEnabled}
                 layoutMode={layoutMode}
                 simulateTouch={simulateTouch}
+                isPlaytestMode={isPlaytestMode}
+                onPlaytestComplete={handlePlaytestComplete}
                 onGameEnd={handleGameEnd}
                 onStatsUpdate={setStats}
               />
@@ -799,6 +844,99 @@ export default function App() {
             soundEnabled={soundEnabled}
             setSoundEnabled={setSoundEnabled}
           />
+        )}
+
+        {/* Sid & Scott Playtest Completion Modal */}
+        {showPlaytestModal && playtestLog && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="w-full max-w-md bg-brand-ivory border-3 border-brand-charcoal p-6 shadow-[8px_8px_0px_0px_#1A1A1A] space-y-4"
+            >
+              <div className="text-center space-y-1">
+                <span className="inline-block px-3 py-1 bg-brand-red text-white font-mono font-bold text-xs uppercase tracking-widest border border-brand-charcoal">
+                  🧪 3-Min Playtest Concluded
+                </span>
+                <h2 className="text-2xl font-serif font-black text-brand-charcoal">
+                  Playtest Telemetry Logged!
+                </h2>
+                <p className="text-xs text-brand-charcoal/80 font-serif italic">
+                  We've gathered full metrics for Sid (Game Designer) & Scott to analyze!
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="bg-emerald-100 border-2 border-emerald-800 text-emerald-900 p-3 flex items-center gap-2 text-xs font-bold font-mono">
+                <Sparkles className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                <span>✅ Log saved to window.__LAST_PLAYTEST_LOG__ & localStorage!</span>
+              </div>
+
+              {/* Stats Summary Grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                <div className="bg-white border-2 border-brand-charcoal p-2.5">
+                  <span className="text-[10px] text-brand-charcoal/60 uppercase block">Total Catches</span>
+                  <span className="text-base font-black text-brand-red">{playtestLog.successfulCatches} flies</span>
+                </div>
+                <div className="bg-white border-2 border-brand-charcoal p-2.5">
+                  <span className="text-[10px] text-brand-charcoal/60 uppercase block">Pinches / Misses</span>
+                  <span className="text-base font-black text-brand-charcoal">{playtestLog.totalPinches} / {playtestLog.missedAttempts}</span>
+                </div>
+                <div className="bg-white border-2 border-brand-charcoal p-2.5">
+                  <span className="text-[10px] text-brand-charcoal/60 uppercase block">Accuracy Rate</span>
+                  <span className="text-base font-black text-emerald-700">{playtestLog.accuracyPercentage}%</span>
+                </div>
+                <div className="bg-white border-2 border-brand-charcoal p-2.5">
+                  <span className="text-[10px] text-brand-charcoal/60 uppercase block">Max Combo Streak</span>
+                  <span className="text-base font-black text-purple-700">{playtestLog.maxCombo}x</span>
+                </div>
+              </div>
+
+              {/* Catches Breakdown */}
+              <div className="bg-brand-linen border-2 border-brand-charcoal p-3 text-xs space-y-1 font-serif">
+                <span className="font-black text-brand-charcoal block uppercase text-[10px] tracking-wider">Species Caught Breakdown:</span>
+                <div className="flex justify-between font-mono text-[11px]">
+                  <span>🍎 Fruitfly: <strong>{playtestLog.catchesByType.fruitfly || 0}</strong></span>
+                  <span>🏠 Housefly: <strong>{playtestLog.catchesByType.housefly || 0}</strong></span>
+                  <span>🪰 Bluebottle: <strong>{playtestLog.catchesByType.bluebottle || 0}</strong></span>
+                  <span>🥷 Ninja: <strong>{playtestLog.catchesByType.ninja || 0}</strong></span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={() => {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(playtestLog, null, 2));
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", `playtest_telemetry_${Date.now()}.json`);
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+                  }}
+                  className="w-full py-2.5 bg-brand-red hover:bg-brand-charcoal text-white font-serif font-black text-xs tracking-wider uppercase border-2 border-brand-charcoal shadow-[2px_2px_0px_0px_#1A1A1A] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  📥 Download Playtest JSON File
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(JSON.stringify(playtestLog, null, 2));
+                    alert('Copied Telemetry JSON to clipboard!');
+                  }}
+                  className="w-full py-2 bg-white hover:bg-brand-linen text-brand-charcoal font-serif font-bold text-xs border-2 border-brand-charcoal transition-colors cursor-pointer"
+                >
+                  📋 Copy JSON to Clipboard
+                </button>
+                <button
+                  onClick={() => setShowPlaytestModal(false)}
+                  className="w-full py-2 bg-brand-charcoal text-brand-linen font-serif font-bold text-xs border-2 border-brand-charcoal transition-colors cursor-pointer"
+                >
+                  🎮 Return to Dojo Menu
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
