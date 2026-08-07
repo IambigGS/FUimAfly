@@ -123,10 +123,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const finishPlaytestSession = useCallback(() => {
     const sessionDurationSec = Math.max(1, Math.round((Date.now() - telemetryRef.current.startTime) / 1000));
-    const totalPinches = telemetryRef.current.totalPinches;
     const successfulCatches = telemetryRef.current.successfulCatches;
+    const rawPinches = telemetryRef.current.totalPinches;
+    const totalPinches = Math.max(rawPinches, successfulCatches + telemetryRef.current.missedAttempts);
     const missedAttempts = Math.max(0, totalPinches - successfulCatches);
-    const accuracyPercentage = totalPinches > 0 ? Math.round((successfulCatches / totalPinches) * 100) : 0;
+    const accuracyPercentage = totalPinches > 0 ? Math.round((successfulCatches / totalPinches) * 100) : (successfulCatches > 0 ? 100 : 0);
 
     let averageTimeBetweenCatchesSec = 0;
     const ts = telemetryRef.current.catchTimestamps;
