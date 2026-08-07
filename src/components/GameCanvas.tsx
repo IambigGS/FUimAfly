@@ -676,11 +676,34 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ];
     }
 
+    // High-precision timing ref for Telegram 29 FPS throttle
+    const lastFrameTimeRef = { current: 0 };
+
     // Main animation ticks
-    const renderLoop = () => {
+    const renderLoop = (timestamp: DOMHighResTimeStamp = performance.now()) => {
       if (activeCutsceneRef.current !== null) {
         animFrameId = requestAnimationFrame(renderLoop);
         return;
+      }
+
+      // Detect Telegram environment (Telegram WebApp or mobile/PC WebView)
+      const isTelegram = typeof window !== 'undefined' && (
+        Boolean((window as any).Telegram?.WebApp?.platform && (window as any).Telegram.WebApp.platform !== 'unknown')
+      );
+
+      if (isTelegram) {
+        const TARGET_FPS = 29.0;
+        const TARGET_INTERVAL = 1000 / TARGET_FPS; // ~34.48ms
+        if (!lastFrameTimeRef.current) {
+          lastFrameTimeRef.current = timestamp;
+        }
+        const elapsed = timestamp - lastFrameTimeRef.current;
+
+        if (elapsed < TARGET_INTERVAL) {
+          animFrameId = requestAnimationFrame(renderLoop);
+          return;
+        }
+        lastFrameTimeRef.current = timestamp - (elapsed % TARGET_INTERVAL);
       }
 
       if (!ctx || !canvas) return;
