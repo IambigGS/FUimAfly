@@ -41,6 +41,7 @@ class AudioEngine {
   private musicVolume = 0.3;
   private sfxVolume = 0.6;
   private soundEnabled = true;
+  private isCutsceneMuted = false;
 
   constructor() {
     // Lazy initialized on first interaction
@@ -65,8 +66,63 @@ class AudioEngine {
       this.sfxGain.connect(this.masterGain);
 
       this.loadAllFlySounds();
+      this.setupLifecycleListeners();
     } catch (e) {
       console.error('Failed to initialize Web Audio API:', e);
+    }
+  }
+
+  private setupLifecycleListeners() {
+    if (typeof window === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (!this.ctx) return;
+
+      if (document.hidden) {
+        if (this.ctx.state === 'running') {
+          this.ctx.suspend().catch(console.warn);
+        }
+        if (this.activeFlybyAudio) {
+          this.activeFlybyAudio.pause();
+        }
+      } else {
+        if (this.ctx.state === 'suspended' && !this.isCutsceneMuted) {
+          this.ctx.resume().catch(console.warn);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handleVisibilityChange);
+  }
+
+  pauseForCutscene() {
+    this.isCutsceneMuted = true;
+    this.clearAllBuzzers();
+    this.stopZenFluteMelody();
+    this.stopFlybyNarration();
+
+    if (this.ctx && this.masterGain) {
+      const now = this.ctx.currentTime;
+      this.masterGain.gain.cancelScheduledValues(now);
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+      this.masterGain.gain.linearRampToValueAtTime(0, now + 0.1);
+    }
+  }
+
+  resumeFromCutscene(isGameplayActive: boolean) {
+    this.isCutsceneMuted = false;
+
+    if (this.ctx && this.masterGain) {
+      const now = this.ctx.currentTime;
+      const targetMaster = this.soundEnabled ? this.masterVolume : 0;
+      this.masterGain.gain.cancelScheduledValues(now);
+      this.masterGain.gain.setValueAtTime(0, now);
+      this.masterGain.gain.linearRampToValueAtTime(targetMaster, now + 0.15);
+    }
+
+    if (isGameplayActive && this.soundEnabled) {
+      this.startZenFluteMelody();
     }
   }
 

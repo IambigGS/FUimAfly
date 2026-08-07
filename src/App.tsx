@@ -338,10 +338,12 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.3 }}
-            className="flex-1 flex flex-col items-center justify-start md:justify-center pt-8 pb-12 px-4 md:p-8 z-10 select-none overflow-y-auto"
+            className="flex-1 min-h-0 flex flex-col h-full z-10 select-none overflow-hidden relative"
           >
-            {/* Title Calligraphy Frame */}
-            <div className={`text-center max-w-xl ${viewportMode === 'telegram_pc' ? 'mb-2 pt-1' : 'mb-6 md:mb-10'} z-10 relative`}>
+            {/* Scrollable Upper Content Body */}
+            <div className={`flex-1 min-h-0 w-full overflow-y-auto scroll-touch ${viewportMode === 'telegram_pc' ? 'pt-3 pb-6 px-3' : 'pt-8 pb-12 px-4 md:p-8'} flex flex-col items-center justify-start`}>
+              {/* Title Calligraphy Frame */}
+              <div className={`text-center max-w-xl ${viewportMode === 'telegram_pc' ? 'mb-2 pt-1' : 'mb-6 md:mb-10'} z-10 relative`}>
               {viewportMode === 'telegram_pc' && (
                 <div className="absolute -top-1 left-0 w-7 h-7 text-xs border border-brand-red border-dashed flex items-center justify-center font-serif font-extrabold text-brand-red rotate-[-12deg] select-none pointer-events-none">
                   <span>禅</span>
@@ -575,6 +577,20 @@ export default function App() {
                 </div>
               </div>
             </div>
+            </div>
+
+            {/* Sticky Bottom Action Bar for Telegram & Mobile Viewports */}
+            {viewportMode === 'telegram_pc' && (
+              <div className="shrink-0 w-full bg-brand-ivory border-t-3 border-brand-charcoal p-3 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center">
+                <button
+                  onClick={() => handleStartGame('training')}
+                  id="telegram-sticky-start-btn"
+                  className="w-full py-3 px-4 bg-brand-red hover:bg-brand-charcoal text-white font-serif font-black text-sm uppercase tracking-wider border-2 border-brand-charcoal shadow-[3px_3px_0px_0px_#1A1A1A] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Play className="w-5 h-5 fill-current" /> Start Game Now 🥟
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -829,7 +845,7 @@ export default function App() {
           </div>
 
           {/* Inner Playable Canvas Container */}
-          <div className="relative flex-1 w-full h-full overflow-hidden flex flex-col">
+          <div className="relative flex-1 min-h-0 w-full h-full overflow-hidden flex flex-col">
             {appCoreContent}
           </div>
         </div>

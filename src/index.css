@@ -38,4 +38,9 @@ html, body, #root {
   overscroll-behavior: none;
 }
 
+.scroll-touch {
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch;
+}
+
 

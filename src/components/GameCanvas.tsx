@@ -42,7 +42,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 }) => {
   const isTouchMode = () => simulateTouch || isMobileOrTouchDevice();
   const [activeCutscene, setActiveCutscene] = useState<'intro' | 'ninja' | null>(null);
+  const [isVideoBuffered, setIsVideoBuffered] = useState(false);
   const cutsceneActive = activeCutscene !== null;
+
+  // Synchronous ref to bypass stale React closures inside requestAnimationFrame & intervals
+  const activeCutsceneRef = useRef<'intro' | 'ninja' | null>(null);
+  const videoWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    activeCutsceneRef.current = activeCutscene;
+  }, [activeCutscene]);
+
   const introPlayedRef = useRef(false);
   const isGoldenSweepActiveRef = useRef(false);
   const goldenSweepStateRef = useRef<'TARGETING' | 'CATCHING' | 'RELEASING' | 'IDLE'>('IDLE');
@@ -410,6 +420,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   };
 
   const finishCutscene = useCallback(() => {
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+        videoRef.current.currentTime = 0;
+      } catch (e) {}
+    }
+
     setActiveCutscene((currentType) => {
       if (currentType === 'ninja') {
         cutscenePlayedRef.current = true;
@@ -423,7 +440,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
       return null;
     });
-  }, []);
+
+    audio.resumeFromCutscene(isPlaying);
+  }, [isPlaying]);
 
   const startIntroCutscene = useCallback(() => {
     if (introPlayedRef.current) return;
@@ -659,7 +678,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // Main animation ticks
     const renderLoop = () => {
-      if (cutsceneActive) {
+      if (activeCutsceneRef.current !== null) {
         animFrameId = requestAnimationFrame(renderLoop);
         return;
       }
@@ -2483,6 +2502,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // Spawn and landing ticker to direct flies to dumplings and soda rim
     spawnTimerRef.current = window.setInterval(() => {
+      if (activeCutsceneRef.current !== null) return; // Freeze fly spawning during active cutscenes!
+
       const activeFlies = fliesRef.current.filter(f => !f.isCaught && f.state !== 'releasing');
       const cap = frenzyActive ? 8 : 5;
       
@@ -2512,6 +2533,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // Second Ticker for Feast Health Drain & Ninja Fly Spawns
     secondTimerRef.current = window.setInterval(() => {
+      if (activeCutsceneRef.current !== null) return; // Freeze health drain & Ninja triggers during active cutscenes!
+
       const stats = statsRef.current;
       
       // Spawning condition for Ninja Fly (Triggers on Level 1 after 2 dumplings are eaten)
@@ -2566,24 +2589,41 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           className="absolute inset-0 z-30 bg-black cursor-pointer flex items-center justify-center overflow-hidden"
           onClick={finishCutscene}
         >
+          {/* Zen Pre-buffering Loading Indicator */}
+          {!isVideoBuffered && (
+            <div className="absolute inset-0 z-40 bg-black flex flex-col items-center justify-center gap-3 p-4 pointer-events-none">
+              <div className="w-10 h-10 border-3 border-brand-red border-t-transparent rounded-full animate-spin" />
+              <span className="font-serif font-black text-sm text-brand-ivory tracking-widest uppercase animate-pulse">
+                Preparing Dojo Cutscene...
+              </span>
+            </div>
+          )}
+
           <video
             ref={videoRef}
             autoPlay
             muted={!soundEnabled}
             playsInline
+            // @ts-ignore
+            webkit-playsinline="true"
+            // @ts-ignore
+            x5-playsinline="true"
+            preload="auto"
+            disablePictureInPicture
+            onCanPlayThrough={() => setIsVideoBuffered(true)}
             onEnded={finishCutscene}
             onError={(e) => {
-              console.warn("Cutscene video error, skipping to gameplay:", e);
+              console.warn("[Telegram Cutscene] Video error event triggered:", e);
               finishCutscene();
             }}
-            className="w-full h-full object-cover pointer-events-none"
+            className="w-full h-full object-contain bg-black pointer-events-none"
             src={getAssetUrl(
               activeCutscene === 'intro'
                 ? 'assets/videos/Intro_Scene_p123.mp4'
                 : 'assets/videos/Ninja_Fly_TakeOver_01.mp4'
             )}
           />
-          <div className="absolute bottom-6 right-6 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20 animate-pulse pointer-events-none">
+          <div className="absolute bottom-6 right-6 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-md border border-white/30 animate-pulse pointer-events-none z-50">
             Tap anywhere to skip ⏩
           </div>
         </div>
