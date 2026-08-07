@@ -388,7 +388,15 @@ export default function App() {
               <h1 className={`${viewportMode === 'telegram_pc' ? 'text-xl' : 'text-4xl md:text-5xl'} font-serif font-black text-brand-charcoal tracking-tight leading-none`}>
                 Chopstick Fly Catcher
               </h1>
-              <p className={`${viewportMode === 'telegram_pc' ? 'text-[10px]' : 'text-[11px] md:text-sm'} text-brand-charcoal/80 mt-1 max-w-md mx-auto italic font-serif`}>
+              {/* Active Build & Test Indicator Badge */}
+              <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-amber-100/90 border-2 border-amber-700 rounded-full text-amber-950 font-mono text-[10px] sm:text-xs font-bold tracking-tight shadow-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                </span>
+                <span>ACTIVE BUILD: 🧲 Magnetic Chopsticks & Swarm Overhaul (V2.4)</span>
+              </div>
+              <p className={`${viewportMode === 'telegram_pc' ? 'text-[10px]' : 'text-[11px] md:text-sm'} text-brand-charcoal/80 mt-1.5 max-w-md mx-auto italic font-serif`}>
                 "Concentration is the path to speed. Control your chopsticks, control your destiny."
               </p>
               <div className={`w-16 h-0.5 bg-brand-charcoal mx-auto ${viewportMode === 'telegram_pc' ? 'mt-1.5' : 'mt-2.5'}`}></div>
