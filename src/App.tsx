@@ -94,6 +94,25 @@ export default function App() {
     }
   };
 
+  // Target FPS State (30 vs 60 FPS)
+  const [targetFps, setTargetFps] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('dojo_target_fps');
+      return saved ? parseInt(saved, 10) : 60;
+    } catch {
+      return 60;
+    }
+  });
+
+  const handleTargetFpsChange = (fps: number) => {
+    setTargetFps(fps);
+    try {
+      localStorage.setItem('dojo_target_fps', fps.toString());
+    } catch (e) {
+      console.warn('Failed to save target FPS preference:', e);
+    }
+  };
+
   // Active Live Statistics
   const [stats, setStats] = useState<GameStats>({
     score: 0,
@@ -342,7 +361,7 @@ export default function App() {
     <div className={`relative w-full h-full flex flex-col font-sans select-none ${viewportMode === 'desktop' ? 'border-8 md:border-[20px] border-brand-charcoal' : 'border-0'}`}>
       {/* Woodblock Frame Art Accents */}
       {/* 1. Dojo Ambiance Canvas Background */}
-      <DojoBackground showBlossoms={true} windSpeed={gameState === 'playing' ? 1.4 : 0.8} />
+      <DojoBackground showBlossoms={true} windSpeed={gameState === 'playing' ? 1.4 : 0.8} targetFps={targetFps} />
 
       {/* Vertical Brand Watermark */}
       <div className={`${viewportMode === 'telegram_pc' ? 'hidden' : 'hidden xl:block'} absolute left-10 top-1/2 -translate-y-1/2 select-none pointer-events-none text-brand-charcoal/[0.04] font-serif font-black tracking-widest text-8xl uppercase [writing-mode:vertical-rl] [text-orientation:mixed] z-0`}>
@@ -485,19 +504,26 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Viewport Simulator Selector (PC / Dev Mode) */}
+                  {/* Viewport & Performance Target Selector (PC & Mobile / Dev Mode) */}
                   <div className="bg-brand-linen border-2 border-brand-charcoal p-3 rounded-none space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-serif font-black text-xs text-brand-charcoal uppercase tracking-wider flex items-center gap-1.5">
-                        <Monitor className="w-3.5 h-3.5 text-brand-red" /> PC Viewport Target
+                        <Monitor className="w-3.5 h-3.5 text-brand-red" /> Viewport & FPS Targets
                       </span>
                       <span className="text-[10px] font-mono bg-brand-ivory border border-brand-charcoal px-1.5 py-0.5 text-brand-charcoal font-bold">
-                        {viewportMode === 'telegram_pc' ? '370 × 574 px' : 'Full Screen'}
+                        {viewportMode === 'telegram_pc' && targetFps === 30
+                          ? '370 × 574 px (30 FPS Lock)'
+                          : viewportMode === 'telegram_pc'
+                          ? '370 × 574 px (60 FPS)'
+                          : 'Full Screen (60 FPS)'}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <button
-                        onClick={() => handleViewportModeChange('desktop')}
+                        onClick={() => {
+                          handleViewportModeChange('desktop');
+                          handleTargetFpsChange(60);
+                        }}
                         id="viewport-desktop-btn"
                         className={`p-2 border-2 border-brand-charcoal text-xs font-serif font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                           viewportMode === 'desktop'
@@ -508,16 +534,45 @@ export default function App() {
                         <Monitor className="w-3.5 h-3.5" /> Full Desktop
                       </button>
                       <button
-                        onClick={() => handleViewportModeChange('telegram_pc')}
+                        onClick={() => {
+                          handleViewportModeChange('telegram_pc');
+                          handleTargetFpsChange(60);
+                        }}
                         id="viewport-telegram-btn"
                         className={`p-2 border-2 border-brand-charcoal text-xs font-serif font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                          viewportMode === 'telegram_pc'
+                          viewportMode === 'telegram_pc' && targetFps === 60
                             ? 'bg-brand-red text-white shadow-[2px_2px_0px_0px_#1A1A1A]'
                             : 'bg-white text-brand-charcoal hover:bg-brand-ivory'
                         }`}
                       >
-                        <Smartphone className="w-3.5 h-3.5" /> Telegram PC (370×574)
+                        <Smartphone className="w-3.5 h-3.5" /> Telegram PC
                       </button>
+                      <button
+                        onClick={() => {
+                          handleViewportModeChange('telegram_pc');
+                          handleTargetFpsChange(30);
+                          setSimulateTouch(true);
+                        }}
+                        id="viewport-telegram-30fps-btn"
+                        className={`p-2 border-2 border-brand-charcoal text-xs font-serif font-bold flex items-center justify-between gap-1 transition-all cursor-pointer ${
+                          viewportMode === 'telegram_pc' && targetFps === 30
+                            ? 'bg-brand-red text-white shadow-[2px_2px_0px_0px_#1A1A1A]'
+                            : 'bg-white text-brand-charcoal hover:bg-brand-ivory'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <Smartphone className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Tg Mobile</span>
+                        </div>
+                        <span className={`text-[9px] font-mono font-black px-1 py-0.2 border border-brand-charcoal ${
+                          viewportMode === 'telegram_pc' && targetFps === 30
+                            ? 'bg-brand-charcoal text-amber-300 border-amber-300'
+                            : 'bg-amber-300 text-brand-charcoal'
+                        }`}>
+                          30 FPS
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Input Mode Toggle (Simulate Touchscreen on PC) */}
@@ -704,7 +759,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-            </div>
 
             {/* Sticky Bottom Action Bar for Telegram & Mobile Viewports */}
             {viewportMode === 'telegram_pc' && (
@@ -767,9 +821,31 @@ export default function App() {
               >
                 Exit
               </button>
+              <div className="flex items-center gap-2 pointer-events-auto">
+                <div className="flex bg-white border-2 border-brand-charcoal">
+                  {[30, 60, 144].map((fps) => (
+                    <button
+                      key={fps}
+                      onClick={() => setTargetFps(fps)}
+                      className={`px-2 py-0.5 text-[10px] font-mono font-bold border-r last:border-r-0 border-brand-charcoal ${targetFps === fps ? 'bg-brand-charcoal text-white' : 'hover:bg-brand-linen'}`}
+                    >
+                      {fps}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm('Return to Dojo Menu? Your active score will be lost.')) {
+                      setGameState('menu');
+                      audio.clearAllBuzzers();
+                    }
+                  }}
+                  className="px-3 py-1 bg-white/90 hover:bg-brand-linen border-2 border-brand-charcoal font-serif font-black shadow-[2px_2px_0px_0px_#1A1A1A] text-sm text-brand-charcoal cursor-pointer"
+                >
+                  Exit
+                </button>
+              </div>
             </div>
-
-
 
             {/* Main Interactive High FPS Game Canvas Stage */}
             <div className="flex-1 relative bg-transparent overflow-hidden shadow-inner">
@@ -782,6 +858,7 @@ export default function App() {
                 soundEnabled={soundEnabled}
                 layoutMode={layoutMode}
                 simulateTouch={simulateTouch}
+                targetFps={targetFps}
                 isPlaytestMode={isPlaytestMode}
                 onPlaytestComplete={handlePlaytestComplete}
                 onGameEnd={handleGameEnd}

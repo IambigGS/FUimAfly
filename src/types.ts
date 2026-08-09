@@ -138,6 +138,7 @@ export interface PlaytestLog {
   averageTimeBetweenCatchesSec: number;
   difficulty: string;
   viewportMode: string;
+  targetFps: number;
 }
 
 declare global {

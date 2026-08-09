@@ -4,11 +4,13 @@ import { CherryBlossom } from '../types';
 interface DojoBackgroundProps {
   showBlossoms?: boolean;
   windSpeed?: number;
+  targetFps?: number;
 }
 
 export const DojoBackground: React.FC<DojoBackgroundProps> = ({
   showBlossoms = true,
   windSpeed = 1.0,
+  targetFps = 60,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const blossomsRef = useRef<CherryBlossom[]>([]);
@@ -110,7 +112,7 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
     };
 
     let lastFrameTime = performance.now();
-    const FRAME_INTERVAL = 1000 / 60; // 16.66ms (60 FPS cap)
+    const FRAME_INTERVAL = 1000 / (targetFps || 60);
 
     const animate = (currentTime: number = performance.now()) => {
       animationFrameRef.current = requestAnimationFrame(animate);
@@ -165,7 +167,7 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [showBlossoms, windSpeed]);
+  }, [showBlossoms, windSpeed, targetFps]);
 
   return (
     <canvas

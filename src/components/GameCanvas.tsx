@@ -25,6 +25,7 @@ interface GameCanvasProps {
   soundEnabled: boolean;
   layoutMode?: 'original' | 'triangular';
   simulateTouch?: boolean;
+  targetFps?: number;
   isPlaytestMode?: boolean;
   onPlaytestComplete?: (log: PlaytestLog) => void;
   onGameEnd: (stats: GameStats) => void;
@@ -40,6 +41,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   soundEnabled,
   layoutMode = 'triangular',
   simulateTouch = false,
+  targetFps = 60,
   isPlaytestMode = false,
   onPlaytestComplete,
   onGameEnd,
@@ -787,7 +789,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ];
     }
 
-    // High-precision timing ref for Telegram 29 FPS throttle
+    // High-precision timing ref for frame rate throttle
     const lastFrameTimeRef = { current: 0 };
 
     // Main animation ticks
@@ -797,25 +799,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         return;
       }
 
-      // Detect Telegram environment (Telegram WebApp or mobile/PC WebView)
-      const isTelegram = typeof window !== 'undefined' && (
-        Boolean((window as any).Telegram?.WebApp?.platform && (window as any).Telegram.WebApp.platform !== 'unknown')
-      );
+      const effectiveFps = targetFps || 60;
+      const TARGET_INTERVAL = 1000 / effectiveFps;
 
-      if (isTelegram) {
-        const TARGET_FPS = 29.0;
-        const TARGET_INTERVAL = 1000 / TARGET_FPS; // ~34.48ms
-        if (!lastFrameTimeRef.current) {
-          lastFrameTimeRef.current = timestamp;
-        }
-        const elapsed = timestamp - lastFrameTimeRef.current;
-
-        if (elapsed < TARGET_INTERVAL) {
-          animFrameId = requestAnimationFrame(renderLoop);
-          return;
-        }
-        lastFrameTimeRef.current = timestamp - (elapsed % TARGET_INTERVAL);
+      if (!lastFrameTimeRef.current) {
+        lastFrameTimeRef.current = timestamp;
       }
+      const elapsed = timestamp - lastFrameTimeRef.current;
+
+      if (elapsed < TARGET_INTERVAL - 0.5) {
+        animFrameId = requestAnimationFrame(renderLoop);
+        return;
+      }
+
+      lastFrameTimeRef.current = timestamp - (elapsed % TARGET_INTERVAL);
 
       if (!ctx || !canvas) return;
 
