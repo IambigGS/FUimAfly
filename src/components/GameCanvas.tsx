@@ -3,6 +3,7 @@ import { Fly, FlyType, Particle, GameStats, ChopstickConfig, PlaytestLog, GameMo
 import { audio, getAssetUrl } from '../utils/audio';
 import { CHOPSTICK_STYLES } from './SettingsModal';
 import { Capacitor } from '@capacitor/core';
+import CutsceneOverlay from './CutsceneOverlay';
 
 export const isMobileOrTouchDevice = (): boolean => {
   if (Capacitor.isNativePlatform()) return true;
@@ -545,12 +546,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const startIntroCutscene = useCallback(() => {
     if (introPlayedRef.current) return;
+    audio.pauseForCutscene();
     dragItemRef.current = null;
     setActiveCutscene('intro');
   }, []);
 
   const startNinjaCutscene = useCallback(() => {
     if (hasSpawnedNinjaThisSession.current || cutscenePlayedRef.current) return;
+    audio.pauseForCutscene();
     hasSpawnedNinjaThisSession.current = true;
     cutscenePlayedRef.current = true;
     dragItemRef.current = null;
@@ -565,6 +568,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   useEffect(() => {
     if (activeCutscene) {
+      audio.pauseForCutscene();
       const timeoutMs = activeCutscene === 'intro' ? 30000 : 7500;
       const timer = setTimeout(() => {
         finishCutscene();
@@ -2982,50 +2986,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       {/* High FPS Game Arena Canvas */}
       <canvas ref={canvasRef} id="arcade-game-canvas" className="block w-full h-full" />
 
-      {/* Cinematic Cutscene Overlay */}
+      {/* Cinematic Cutscene Portal Isolation */}
       {cutsceneActive && (
-        <div 
-          className="absolute inset-0 z-30 bg-black cursor-pointer flex items-center justify-center overflow-hidden"
-          onClick={finishCutscene}
-        >
-          {/* Zen Pre-buffering Loading Indicator */}
-          {!isVideoBuffered && (
-            <div className="absolute inset-0 z-40 bg-black flex flex-col items-center justify-center gap-3 p-4 pointer-events-none">
-              <div className="w-10 h-10 border-3 border-brand-red border-t-transparent rounded-full animate-spin" />
-              <span className="font-serif font-black text-sm text-brand-ivory tracking-widest uppercase animate-pulse">
-                Preparing Dojo Cutscene...
-              </span>
-            </div>
+        <CutsceneOverlay
+          src={getAssetUrl(
+            activeCutscene === 'intro'
+              ? 'assets/videos/Intro_Scene_p123.mp4'
+              : 'assets/videos/Ninja_Fly_TakeOver_01.mp4'
           )}
-
-          <video
-            ref={videoRef}
-            autoPlay
-            muted={!soundEnabled}
-            playsInline
-            // @ts-ignore
-            webkit-playsinline="true"
-            // @ts-ignore
-            x5-playsinline="true"
-            preload="auto"
-            disablePictureInPicture
-            onCanPlayThrough={() => setIsVideoBuffered(true)}
-            onEnded={finishCutscene}
-            onError={(e) => {
-              console.warn("[Telegram Cutscene] Video error event triggered:", e);
-              finishCutscene();
-            }}
-            className="w-full h-full object-contain bg-black pointer-events-none"
-            src={getAssetUrl(
-              activeCutscene === 'intro'
-                ? 'assets/videos/Intro_Scene_p123.mp4'
-                : 'assets/videos/Ninja_Fly_TakeOver_01.mp4'
-            )}
-          />
-          <div className="absolute bottom-6 right-6 bg-black/70 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-md border border-white/30 animate-pulse pointer-events-none z-50">
-            Tap anywhere to skip ⏩
-          </div>
-        </div>
+          onEnded={finishCutscene}
+          onSkip={finishCutscene}
+          soundEnabled={soundEnabled}
+        />
       )}
 
       {/* In-Game 3-Minute Playtest Logging HUD Indicator */}

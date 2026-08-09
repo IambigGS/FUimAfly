@@ -206,6 +206,7 @@ class AudioEngine {
 
   // Generate a wooden chopsticks click / clack sound
   playClack() {
+    if (this.isCutsceneMuted) return;
     this.resume();
     if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
 
@@ -278,6 +279,7 @@ class AudioEngine {
 
   // Play catching-success splash sound
   playCatch(type: 'standard' | 'rare' | 'combo') {
+    if (this.isCutsceneMuted) return;
     this.resume();
     if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
 
@@ -353,6 +355,7 @@ class AudioEngine {
 
   // Play general retro arcade sounds
   playSfx(effect: 'time-warning' | 'game-over' | 'frenzy' | 'levelup' | 'escape' | 'ouch' | 'sputter' | 'complain') {
+    if (this.isCutsceneMuted) return;
     this.resume();
     if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
 
@@ -434,6 +437,7 @@ class AudioEngine {
 
   // Play dumpling munch sound
   playMunch() {
+    if (this.isCutsceneMuted) return;
     this.resume();
     if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
 
@@ -468,6 +472,7 @@ class AudioEngine {
 
   // Play matcha tea gulp sound
   playGulp() {
+    if (this.isCutsceneMuted) return;
     this.resume();
     if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
 
@@ -776,6 +781,7 @@ class AudioEngine {
     isActive: boolean;
     soundCategory?: 'flying' | 'landed_drink' | 'landed_dumpling' | 'captured';
   }) {
+    if (this.isCutsceneMuted) return;
     this.resume();
     if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
 

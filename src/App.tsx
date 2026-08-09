@@ -1037,9 +1037,7 @@ export default function App() {
     return (
       <div className="w-screen h-screen bg-neutral-900 flex flex-col items-center justify-center p-2 sm:p-4 overflow-hidden relative font-sans select-none">
         {/* Background Ambiance */}
-        <div className="absolute inset-0 opacity-20 pointer-events-none">
-          <DojoBackground showBlossoms={true} windSpeed={0.4} />
-        </div>
+        <div className="absolute inset-0 opacity-20 pointer-events-none bg-neutral-950" />
 
         {/* Simulated Telegram PC Frame Container (370px x 574px) */}
         <div className="relative w-[370px] h-[574px] bg-brand-linen border-4 border-brand-charcoal shadow-[0_25px_60px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden rounded-md z-10">

@@ -109,7 +109,18 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
       ctx.restore();
     };
 
-    const animate = () => {
+    let lastFrameTime = performance.now();
+    const FRAME_INTERVAL = 1000 / 60; // 16.66ms (60 FPS cap)
+
+    const animate = (currentTime: number = performance.now()) => {
+      animationFrameRef.current = requestAnimationFrame(animate);
+
+      if (typeof document !== 'undefined' && document.hidden) return;
+
+      const elapsed = currentTime - lastFrameTime;
+      if (elapsed < FRAME_INTERVAL - 1) return; // Skip extra frames on high refresh displays
+      lastFrameTime = currentTime - (elapsed % FRAME_INTERVAL);
+
       drawBackground();
 
       if (showBlossoms) {
@@ -144,11 +155,9 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
         });
         ctx.restore();
       }
-
-      animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    animate();
+    animationFrameRef.current = requestAnimationFrame(animate);
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
