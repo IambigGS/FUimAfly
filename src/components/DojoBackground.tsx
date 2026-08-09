@@ -28,34 +28,6 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      drawBackground();
-    };
-
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    // Initialize Cherry Blossoms
-    const createBlossom = (initYRandom = true): CherryBlossom => {
-      return {
-        id: Math.random().toString(),
-        x: Math.random() * window.innerWidth,
-        y: initYRandom ? Math.random() * window.innerHeight : -20,
-        size: 6 + Math.random() * 12,
-        speedX: (0.5 + Math.random() * 1.5) * windSpeed,
-        speedY: 1.0 + Math.random() * 2.0,
-        angle: Math.random() * Math.PI * 2,
-        spin: (Math.random() - 0.5) * 0.03,
-        opacity: 0.4 + Math.random() * 0.5,
-      };
-    };
-
-    // Populate initial petals
-    const petalCount = Math.min(25, Math.floor(window.innerWidth / 45));
-    blossomsRef.current = Array.from({ length: petalCount }, () => createBlossom(true));
-
     const drawBackground = () => {
       if (!ctx || !canvas) return;
 
@@ -116,6 +88,34 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
       ctx.fill();
       ctx.restore();
     };
+
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawBackground();
+    };
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Initialize Cherry Blossoms
+    const createBlossom = (initYRandom = true): CherryBlossom => {
+      return {
+        id: Math.random().toString(),
+        x: Math.random() * window.innerWidth,
+        y: initYRandom ? Math.random() * window.innerHeight : -20,
+        size: 6 + Math.random() * 12,
+        speedX: (0.5 + Math.random() * 1.5) * windSpeed,
+        speedY: 1.0 + Math.random() * 2.0,
+        angle: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.03,
+        opacity: 0.4 + Math.random() * 0.5,
+      };
+    };
+
+    // Populate initial petals
+    const petalCount = Math.min(25, Math.floor(window.innerWidth / 45));
+    blossomsRef.current = Array.from({ length: petalCount }, () => createBlossom(true));
 
     let lastFrameTime = performance.now();
 
