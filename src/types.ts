@@ -1,6 +1,23 @@
 /// <reference types="vite/client" />
 
-export type GameMode = 'arcade' | 'zen' | 'training';
+export type GameMode = 'arcade' | 'zen' | 'training' | 'rhythm';
+
+export interface OsuCircle {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+  approachRadius: number;
+  maxApproachRadius: number;
+  spawnTime: number;
+  hitTime: number;
+  duration: number;
+  number: number;
+  color: string;
+  isHit: boolean;
+  hitResult?: '300' | '100' | '50' | 'miss' | null;
+  resultTime?: number;
+}
 
 export type FlyType = 'housefly' | 'bluebottle' | 'fruitfly' | 'golden' | 'ninja';
 

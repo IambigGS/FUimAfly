@@ -11,20 +11,24 @@ import {
   Settings,
   Trophy,
   Award,
-  BookOpen,
+  Share2,
+  HelpCircle,
+  Home,
+  Code,
   Volume2,
   VolumeX,
-  Target,
-  Clock,
-  Sparkles,
-  ShieldAlert,
-  ChevronRight,
-  ChevronLeft,
-  Monitor,
   Smartphone,
+  Monitor,
+  BookOpen,
+  Clock,
+  Target,
+  Menu,
+  Maximize2,
+  Sparkles
 } from 'lucide-react';
-
 import { DojoBackground } from './components/DojoBackground';
+import NinjaOverlayCanvas, { NinjaOverlayHandle } from './components/NinjaOverlayCanvas';
+import NinjaSurpriseModal from './components/NinjaSurpriseModal';
 import { GameCanvas } from './components/GameCanvas';
 import { HowToPlay } from './components/HowToPlay';
 import { SettingsModal, CHOPSTICK_STYLES } from './components/SettingsModal';
@@ -104,9 +108,27 @@ export default function App() {
 
   // Historical High Scores (Loaded from localStorage)
   const [arcadeHighScore, setArcadeHighScore] = useState(0);
-  const [trainingHighScore, setTrainingHighScore] = useState(0); // high score of dumpling feast
+  const [trainingHighScore, setTrainingHighScore] = useState(0);
+  const [rhythmHighScore, setRhythmHighScore] = useState(0);
   const [lifetimeCaught, setLifetimeCaught] = useState(0);
   const [lifetimeMaxCombo, setLifetimeMaxCombo] = useState(0);
+
+  // Ninja Surprise State
+  const ninjaOverlayRef = useRef<NinjaOverlayHandle>(null);
+  const [showNinjaModal, setShowNinjaModal] = useState(false);
+  const lastNinjaClick = useRef(0);
+
+  const handleNinjaSurpriseClick = () => {
+    const now = Date.now();
+    if (now - lastNinjaClick.current < 300) return; // Debounce
+    lastNinjaClick.current = now;
+    
+    audio.playNinjaButtonPress();
+    setTimeout(() => {
+      audio.playNinjaSmokeBomb();
+      ninjaOverlayRef.current?.triggerSurprise();
+    }, 200);
+  };
 
   // Load Highscores on Mount
   useEffect(() => {
@@ -270,6 +292,11 @@ export default function App() {
           setTrainingHighScore(finalStats.score);
           localStorage.setItem('chop_training_score', finalStats.score.toString());
         }
+      } else if (gameMode === 'rhythm') {
+        if (finalStats.score > rhythmHighScore) {
+          setRhythmHighScore(finalStats.score);
+          localStorage.setItem('chop_rhythm_score', finalStats.score.toString());
+        }
       }
 
       const newLifetime = lifetimeCaught + finalStats.fliesCaught;
@@ -358,7 +385,30 @@ export default function App() {
           >
             <Settings className="w-4 h-4" />
           </button>
+          
+          <button
+            onClick={handleNinjaSurpriseClick}
+            id="ninja-surprise-btn"
+            className="p-2.5 rounded-none bg-purple-950 hover:bg-purple-900 border-2 border-brand-charcoal text-amber-300 hover:shadow-[3px_3px_0px_0px_#6B21A8] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-150 cursor-pointer flex items-center gap-1"
+            title="🥷 Summon Ninja Surprise"
+          >
+            <span className="text-sm leading-none">🥷</span>
+          </button>
         </div>
+      )}
+
+      <NinjaOverlayCanvas 
+        ref={ninjaOverlayRef} 
+        onSequenceComplete={() => setShowNinjaModal(true)} 
+      />
+      {showNinjaModal && (
+        <NinjaSurpriseModal 
+          onClose={() => setShowNinjaModal(false)}
+          onAcceptChallenge={() => {
+            setShowNinjaModal(false);
+            setGameState('playing');
+          }}
+        />
       )}
 
       {/* 3. SCREEN PORTALS */}
@@ -499,6 +549,32 @@ export default function App() {
                   >
                     <Sparkles className="w-4 h-4 text-yellow-400 group-hover:scale-110 transition-transform" />
                     <span>🧪 Start 3-Min Playtest Session (Sid & Scott Log)</span>
+                  </button>
+
+                  {/* Dev Mode: osu! Rhythm Mode Launcher Button */}
+                  <button
+                    onClick={() => handleStartGame('rhythm')}
+                    id="start-rhythm-mode-dev-btn"
+                    className="w-full p-3 bg-purple-700 hover:bg-purple-800 text-white border-2 border-brand-charcoal font-serif font-black text-xs md:text-sm tracking-wider uppercase transition-all duration-150 shadow-[3px_3px_0px_0px_#1A1A1A] cursor-pointer flex items-center justify-center gap-2 group mb-3"
+                  >
+                    <Target className="w-4 h-4 text-pink-300 group-hover:scale-110 transition-transform" />
+                    <span>🎯 Launch osu! Rhythm Mode (Dev Mode)</span>
+                  </button>
+
+                  {/* Ninja Surprise Easter Egg (Luna's Design) */}
+                  <button
+                    onClick={handleNinjaSurpriseClick}
+                    id="ninja-surprise-easter-egg-btn"
+                    data-testid="ninja-surprise-btn"
+                    className="w-full p-3.5 bg-gradient-to-r from-purple-950 via-purple-900 to-indigo-950 hover:from-purple-900 hover:via-purple-800 hover:to-indigo-900 text-white border-3 border-brand-charcoal font-serif font-black text-xs md:text-sm tracking-wider uppercase transition-all duration-150 shadow-[4px_4px_0px_0px_#6B21A8] hover:shadow-[6px_6px_0px_0px_#9333EA] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-amber-300 group-hover:rotate-180 transition-transform duration-500" />
+                      <span>🥷 Unseal Shadow Kata</span>
+                    </div>
+                    <div className="w-8 h-8 text-xs border border-brand-red border-dashed flex items-center justify-center font-serif font-extrabold text-brand-red rotate-12 select-none pointer-events-none group-hover:scale-110 transition-transform">
+                      忍
+                    </div>
                   </button>
 
 
@@ -655,9 +731,10 @@ export default function App() {
             className="flex-1 flex items-stretch justify-stretch z-10 select-none overflow-hidden relative"
           >
             {/* Minimal Overlay HUD for Gameplay */}
-            <div className="flex absolute top-4 left-4 right-4 z-30 justify-between items-start pointer-events-none">
+            <div className="flex absolute top-4 left-16 right-4 z-30 justify-between items-start pointer-events-none">
               <div className="flex gap-2">
-                <div className="bg-white/90 backdrop-blur-sm border-2 border-brand-charcoal px-3 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto">
+                <div className="bg-white/90 backdrop-blur-sm border-2 border-brand-charcoal px-3 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto flex items-center gap-1">
+                  <span className="text-xs font-mono font-bold text-brand-charcoal/70 uppercase">Score:</span>
                   <span className="font-serif font-black text-xl text-brand-charcoal">{stats.score}</span>
                 </div>
                 {gameMode === 'arcade' && (
@@ -669,6 +746,12 @@ export default function App() {
                   <div className="bg-brand-ivory/90 backdrop-blur-sm border-2 border-brand-charcoal px-2 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto flex items-center">
                     <ShieldAlert className="w-4 h-4 text-brand-red mr-1" /> 
                     <span className="font-mono font-bold text-brand-red">Guard</span>
+                  </div>
+                )}
+                {gameMode === 'rhythm' && (
+                  <div className="bg-purple-600/90 backdrop-blur-sm border-2 border-brand-charcoal px-3 py-1 shadow-[2px_2px_0px_0px_#1A1A1A] pointer-events-auto flex items-center gap-1.5">
+                    <Target className="w-4 h-4 text-pink-300 animate-pulse" />
+                    <span className="font-mono font-bold text-white text-sm">osu! Combo: {stats.combo}x</span>
                   </div>
                 )}
               </div>

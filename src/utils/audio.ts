@@ -633,6 +633,81 @@ class AudioEngine {
     osc.stop(time);
   }
 
+  // --- NINJA SURPRISE EASTER EGG AUDIO SUITE ---
+
+  public playNinjaButtonPress(): void {
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    const sub = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(60, now);
+    sub.frequency.exponentialRampToValueAtTime(180, now + 0.15);
+    subGain.gain.setValueAtTime(0.4, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    sub.connect(subGain);
+    subGain.connect(this.sfxGain);
+    sub.start(now);
+    sub.stop(now + 0.2);
+
+    this.playClack();
+  }
+
+  public playNinjaSmokeBomb(): void {
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    if (this.musicGain) {
+      this.musicGain.gain.setTargetAtTime(0.1, now, 0.02);
+      setTimeout(() => {
+        if (this.musicGain && this.ctx) {
+          this.musicGain.gain.setTargetAtTime(this.musicVolume, this.ctx.currentTime, 0.5);
+        }
+      }, 3400);
+    }
+
+    const bufferSize = ctx.sampleRate * 0.2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.04));
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1200, now);
+    filter.frequency.exponentialRampToValueAtTime(250, now + 0.18);
+    filter.Q.setValueAtTime(2.0, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.6, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+    noise.start(now);
+
+    const thud = ctx.createOscillator();
+    const thudGain = ctx.createGain();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(110, now);
+    thud.frequency.exponentialRampToValueAtTime(35, now + 0.18);
+    thudGain.gain.setValueAtTime(0.5, now);
+    thudGain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    thud.connect(thudGain);
+    thudGain.connect(this.sfxGain);
+    thud.start(now);
+    thud.stop(now + 0.22);
+  }
+
   // ------------------------------------------------
 
   private getBuffersForCategory(category: 'flying' | 'landed_drink' | 'landed_dumpling' | 'captured'): AudioBuffer[] {
@@ -989,7 +1064,7 @@ class AudioEngine {
       return;
     }
     
-    const soundUrl = getAssetUrl('sounds/flies/flyBy_sound_1.mp3');
+    const soundUrl = getAssetUrl('sounds/flies/ninja/ninja_1.mp3');
 
     try {
       const audio = new Audio(soundUrl);
@@ -1027,6 +1102,92 @@ class AudioEngine {
       } catch (e) {}
       this.activeFlybyAudio = null;
     }
+  }
+
+  playOsuHit(grade: '300' | '100' | '50' | 'miss') {
+    if (!this.ctx || !this.soundEnabled) return;
+    this.init();
+
+    const now = this.ctx.currentTime;
+    const master = this.ctx.createGain();
+    master.connect(this.masterGain!);
+
+    if (grade === '300') {
+      // Crisp 300 hit sound: high resonant wood/snare ping + sine pulse
+      master.gain.setValueAtTime(0.4, now);
+      master.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      const osc = this.ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(1760, now + 0.08);
+
+      const osc2 = this.ctx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1320, now);
+
+      osc.connect(master);
+      osc2.connect(master);
+      osc.start(now);
+      osc2.start(now);
+      osc.stop(now + 0.18);
+      osc2.stop(now + 0.18);
+    } else if (grade === '100') {
+      // 100 hit sound: medium wood click
+      master.gain.setValueAtTime(0.3, now);
+      master.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+      const osc = this.ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(660, now);
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.12);
+
+      osc.connect(master);
+      osc.start(now);
+      osc.stop(now + 0.14);
+    } else if (grade === '50') {
+      // 50 hit sound: soft low click
+      master.gain.setValueAtTime(0.25, now);
+      master.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      const osc = this.ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(330, now);
+      osc.frequency.exponentialRampToValueAtTime(220, now + 0.1);
+
+      osc.connect(master);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } else {
+      // Miss / Combo break
+      this.playOsuComboBreak();
+    }
+  }
+
+  playOsuComboBreak() {
+    if (!this.ctx || !this.soundEnabled) return;
+    this.init();
+
+    const now = this.ctx.currentTime;
+    const master = this.ctx.createGain();
+    master.gain.setValueAtTime(0.35, now);
+    master.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    master.connect(this.masterGain!);
+
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(350, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.3);
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, now);
+    filter.frequency.exponentialRampToValueAtTime(200, now + 0.3);
+
+    osc.connect(filter);
+    filter.connect(master);
+    osc.start(now);
+    osc.stop(now + 0.35);
   }
 }
 

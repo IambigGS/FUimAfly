@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Fly, FlyType, Particle, GameStats, ChopstickConfig, PlaytestLog } from '../types';
+import { Fly, FlyType, Particle, GameStats, ChopstickConfig, PlaytestLog, GameMode, OsuCircle } from '../types';
 import { audio, getAssetUrl } from '../utils/audio';
 import { CHOPSTICK_STYLES } from './SettingsModal';
 import { Capacitor } from '@capacitor/core';
@@ -17,7 +17,7 @@ export const isMobileOrTouchDevice = (): boolean => {
 
 interface GameCanvasProps {
   isPlaying: boolean;
-  gameMode: 'arcade' | 'zen' | 'training';
+  gameMode: GameMode;
   difficulty: 'easy' | 'normal' | 'hard';
   chopstickStyleId: string;
   showHelper: boolean;
@@ -76,6 +76,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const particlesRef = useRef<Particle[]>([]);
   const floatingTextsRef = useRef<{ id: string; x: number; y: number; text: string; color: string; life: number; maxLife: number }[]>([]);
   const timeScaleRef = useRef(1.0);
+
+  // osu! Rhythm mode refs
+  const osuCirclesRef = useRef<OsuCircle[]>([]);
+  const osuComboRef = useRef<number>(0);
+  const lastOsuSpawnRef = useRef<number>(0);
+  const osuNextNumberRef = useRef<number>(1);
 
   // Telemetry ref for Sid & Scott 3-minute playtest session analysis
   const [playtestTimer, setPlaytestTimer] = useState(180);
@@ -1942,6 +1948,130 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
+      // === OSU! RHYTHM MODE UPDATE & DRAWING ===
+      if (gameMode === 'rhythm') {
+        const now = Date.now();
+
+        // Periodically spawn rhythm circles
+        if (now - lastOsuSpawnRef.current > 900) {
+          const activeCircles = osuCirclesRef.current.filter((c) => !c.isHit && now < c.hitTime + 300);
+          if (activeCircles.length < 5) {
+            const marginX = canvas.width * 0.15;
+            const marginY = canvas.height * 0.15;
+            const spawnX = marginX + Math.random() * (canvas.width - marginX * 2);
+            const spawnY = marginY + Math.random() * (canvas.height - marginY * 2);
+
+            const duration = 1000;
+            const newCircle: OsuCircle = {
+              id: Math.random().toString(),
+              x: spawnX,
+              y: spawnY,
+              radius: 36,
+              approachRadius: 120,
+              maxApproachRadius: 120,
+              spawnTime: now,
+              hitTime: now + duration,
+              duration,
+              number: osuNextNumberRef.current,
+              color: ['#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][osuNextNumberRef.current % 5],
+              isHit: false,
+            };
+            osuNextNumberRef.current = (osuNextNumberRef.current % 9) + 1;
+            lastOsuSpawnRef.current = now;
+            osuCirclesRef.current.push(newCircle);
+          }
+        }
+
+        // Process & Draw active osu circles
+        osuCirclesRef.current = osuCirclesRef.current.filter((circle) => {
+          const elapsed = now - circle.spawnTime;
+
+          // Check miss condition
+          if (!circle.isHit && elapsed > circle.duration + 260) {
+            circle.isHit = true;
+            circle.hitResult = 'miss';
+            circle.resultTime = now;
+            osuComboRef.current = 0;
+            statsRef.current.combo = 0;
+            onStatsUpdate({ ...statsRef.current });
+            audio.playOsuHit('miss');
+
+            floatingTextsRef.current.push({
+              id: Math.random().toString(),
+              x: circle.x,
+              y: circle.y - 20,
+              text: 'MISS',
+              color: '#ef4444',
+              life: 0,
+              maxLife: 45,
+            });
+          }
+
+          if (circle.isHit && circle.resultTime && now - circle.resultTime > 400) {
+            return false;
+          }
+
+          ctx.save();
+
+          if (!circle.isHit) {
+            const progress = Math.min(1.0, Math.max(0, elapsed / circle.duration));
+            const currentApproach = circle.maxApproachRadius - progress * (circle.maxApproachRadius - circle.radius);
+
+            // Outer approach circle (shrinking ring)
+            ctx.strokeStyle = circle.color;
+            ctx.lineWidth = 3.5;
+            ctx.shadowColor = circle.color;
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(circle.x, circle.y, Math.max(circle.radius, currentApproach), 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Inner target circle fill & glow
+            ctx.fillStyle = 'rgba(26, 26, 26, 0.70)';
+            ctx.beginPath();
+            ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Combo number
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(circle.number.toString(), circle.x, circle.y);
+          } else if (circle.hitResult && circle.resultTime) {
+            const resAge = now - circle.resultTime;
+            const resAlpha = Math.max(0, 1 - resAge / 400);
+            const resScale = 1 + (resAge / 400) * 0.4;
+
+            ctx.globalAlpha = resAlpha;
+            ctx.font = `bold ${Math.round(24 * resScale)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (circle.hitResult === '300') {
+              ctx.fillStyle = '#60a5fa';
+              ctx.fillText('300!', circle.x, circle.y);
+            } else if (circle.hitResult === '100') {
+              ctx.fillStyle = '#4ade80';
+              ctx.fillText('100', circle.x, circle.y);
+            } else if (circle.hitResult === '50') {
+              ctx.fillStyle = '#facc15';
+              ctx.fillText('50', circle.x, circle.y);
+            } else {
+              ctx.fillStyle = '#f87171';
+              ctx.fillText('MISS', circle.x, circle.y);
+            }
+          }
+
+          ctx.restore();
+          return true;
+        });
+      }
+
       ctx.restore(); // Balance the camera save
       
       // Draw Simulated Touch Finger Indicator on PC
@@ -2036,10 +2166,109 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     const hitX = mouseRef.current.x;
     const hitY = mouseRef.current.y;
+    const stats = statsRef.current;
+
+    // osu! Rhythm Mode Hit Detection
+    if (gameMode === 'rhythm') {
+      const now = Date.now();
+      const circles = osuCirclesRef.current;
+      let targetCircle: OsuCircle | null = null;
+      let minDistance = 9999;
+
+      for (let i = 0; i < circles.length; i++) {
+        const c = circles[i];
+        if (!c.isHit) {
+          const dist = getDistance(hitX, hitY, c.x, c.y);
+          if (dist <= c.radius * 2.2 && dist < minDistance) {
+            minDistance = dist;
+            targetCircle = c;
+          }
+        }
+      }
+
+      if (targetCircle) {
+        targetCircle.isHit = true;
+        targetCircle.resultTime = now;
+        const timingDelta = Math.abs(now - targetCircle.hitTime);
+
+        let grade: '300' | '100' | '50' | 'miss' = 'miss';
+        let pts = 0;
+        let gradeColor = '#ef4444';
+
+        if (timingDelta <= 120) {
+          grade = '300';
+          pts = 300;
+          gradeColor = '#3b82f6';
+        } else if (timingDelta <= 230) {
+          grade = '100';
+          pts = 100;
+          gradeColor = '#22c55e';
+        } else if (timingDelta <= 340) {
+          grade = '50';
+          pts = 50;
+          gradeColor = '#eab308';
+        }
+
+        targetCircle.hitResult = grade;
+
+        if (grade !== 'miss') {
+          osuComboRef.current += 1;
+          const combo = osuComboRef.current;
+          const totalScoreGain = pts * Math.max(1, combo);
+          stats.score += totalScoreGain;
+          stats.fliesCaught += 1;
+          stats.combo = combo;
+          if (combo > stats.maxCombo) stats.maxCombo = combo;
+
+          audio.playOsuHit(grade);
+
+          floatingTextsRef.current.push({
+            id: Math.random().toString(),
+            x: targetCircle.x,
+            y: targetCircle.y - 25,
+            text: grade === '300' ? '300! PERFECT' : grade === '100' ? '100 GREAT' : '50 GOOD',
+            color: gradeColor,
+            life: 0,
+            maxLife: 45,
+          });
+
+          for (let p = 0; p < 14; p++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 2 + Math.random() * 6;
+            particlesRef.current.push({
+              id: Math.random().toString(),
+              x: targetCircle.x,
+              y: targetCircle.y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              color: targetCircle.color,
+              size: 3 + Math.random() * 4,
+              alpha: 1,
+              life: 0,
+              maxLife: 30,
+            });
+          }
+        } else {
+          osuComboRef.current = 0;
+          stats.combo = 0;
+          audio.playOsuHit('miss');
+          floatingTextsRef.current.push({
+            id: Math.random().toString(),
+            x: targetCircle.x,
+            y: targetCircle.y - 25,
+            text: 'MISS',
+            color: '#ef4444',
+            life: 0,
+            maxLife: 45,
+          });
+        }
+
+        onStatsUpdate({ ...stats });
+      }
+    }
 
     const diffSettings = getDifficultySettings();
     const flies = fliesRef.current;
-    const stats = statsRef.current;
 
     // Strike Hitbox verification
     const strikeRadius = diffSettings.hitRadius;
