@@ -86,6 +86,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const lastOsuSpawnRef = useRef<number>(0);
   const osuNextNumberRef = useRef<number>(1);
 
+  // Sync targetFps into ref for zero-unmount dynamic FPS updates
+  const targetFpsRef = useRef<number>(targetFps);
+  useEffect(() => {
+    targetFpsRef.current = targetFps;
+  }, [targetFps]);
+
   // Telemetry ref for Sid & Scott 3-minute playtest session analysis
   const [playtestTimer, setPlaytestTimer] = useState(180);
   const telemetryRef = useRef({
@@ -706,10 +712,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     let animFrameId: number;
 
     const handleResize = () => {
-      const w = canvas.parentElement?.clientWidth || window.innerWidth;
-      const h = canvas.parentElement?.clientHeight || window.innerHeight;
+      if (!canvas || !canvas.parentElement) return;
+      const w = Math.max(1, canvas.parentElement.clientWidth || window.innerWidth);
+      const h = Math.max(1, canvas.parentElement.clientHeight || window.innerHeight);
       canvas.width = w;
       canvas.height = h;
+
+      // Immediate background fill on resize to prevent white unpainted buffer
+      if (ctx) {
+        ctx.fillStyle = '#f9f6f0';
+        ctx.fillRect(0, 0, w, h);
+      }
 
       // Apply Triangular Layout logic for small screens if requested
       if (w < 500 && layoutMode === 'triangular') {
@@ -799,7 +812,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         return;
       }
 
-      const effectiveFps = targetFps || 60;
+      const effectiveFps = targetFpsRef.current || 60;
       const TARGET_INTERVAL = 1000 / effectiveFps;
 
       if (!lastFrameTimeRef.current) {
@@ -807,7 +820,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
       const elapsed = timestamp - lastFrameTimeRef.current;
 
-      if (elapsed < TARGET_INTERVAL - 0.5) {
+      if (elapsed < TARGET_INTERVAL - 0.4) {
         animFrameId = requestAnimationFrame(renderLoop);
         return;
       }

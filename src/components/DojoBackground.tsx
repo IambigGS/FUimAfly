@@ -16,6 +16,11 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
   const blossomsRef = useRef<CherryBlossom[]>([]);
   const animationFrameRef = useRef<number | null>(null);
 
+  const targetFpsRef = useRef<number>(targetFps);
+  useEffect(() => {
+    targetFpsRef.current = targetFps;
+  }, [targetFps]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -26,6 +31,7 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
     const resizeCanvas = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      drawBackground();
     };
 
     window.addEventListener('resize', resizeCanvas);
@@ -112,13 +118,13 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
     };
 
     let lastFrameTime = performance.now();
-    const FRAME_INTERVAL = 1000 / (targetFps || 60);
 
     const animate = (currentTime: number = performance.now()) => {
       animationFrameRef.current = requestAnimationFrame(animate);
 
       if (typeof document !== 'undefined' && document.hidden) return;
 
+      const FRAME_INTERVAL = 1000 / (targetFpsRef.current || 60);
       const elapsed = currentTime - lastFrameTime;
       if (elapsed < FRAME_INTERVAL - 1) return; // Skip extra frames on high refresh displays
       lastFrameTime = currentTime - (elapsed % FRAME_INTERVAL);
@@ -167,7 +173,7 @@ export const DojoBackground: React.FC<DojoBackgroundProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [showBlossoms, windSpeed, targetFps]);
+  }, [showBlossoms, windSpeed]);
 
   return (
     <canvas
