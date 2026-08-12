@@ -126,9 +126,10 @@ class AudioEngine {
     }
   }
 
-  private async discoverSoundsInFolder(folderPath: string, filePrefix: string, maxProbe = 20): Promise<AudioBuffer[]> {
+  private async discoverSoundsInFolder(folderPath: string, filePrefix: string, maxProbe = 50): Promise<AudioBuffer[]> {
     if (!this.ctx) return [];
     const buffers: AudioBuffer[] = [];
+    let consecutiveFailures = 0;
     
     for (let i = 1; i <= maxProbe; i++) {
       let primaryUrl = getAssetUrl(`sounds/flies/${folderPath}/${filePrefix}_${i}.mp3`);
@@ -146,8 +147,12 @@ class AudioEngine {
       }
 
       if (!response || !response.ok) {
-        break; // Stop checking after first non-existent index
+        consecutiveFailures++;
+        if (consecutiveFailures >= 3) break; // Stop probing after 3 consecutive missing indices
+        continue;
       }
+
+      consecutiveFailures = 0;
 
       try {
         const arrayBuffer = await response.arrayBuffer();
@@ -155,7 +160,6 @@ class AudioEngine {
         buffers.push(audioBuffer);
       } catch (e) {
         console.warn(`Dynamic audio decode stopped at ${folderPath}/${filePrefix}_${i}.mp3:`, e);
-        break;
       }
     }
     return buffers;
@@ -433,6 +437,100 @@ class AudioEngine {
       osc.stop(now + 0.55);
       osc2.stop(now + 0.55);
     }
+  }
+
+  private activeMunchSource: AudioBufferSourceNode | null = null;
+  private munchGainNode: GainNode | null = null;
+  private munchStartTime: number = 0;
+  private munchOffset: number = 0;
+  private munchBufferIndex: number = 0;
+  private currentDumplingId: number | null = null;
+
+  // Play dumpling munch sound (resuming playback position across landed_dumpling tracks)
+  playDumplingMunch(dumplingId?: number) {
+    if (this.isCutsceneMuted) return;
+    this.resume();
+    if (!this.ctx || !this.sfxGain || !this.soundEnabled) return;
+
+    if (this.activeMunchSource) {
+      return; // Already playing cleanly
+    }
+
+    this.currentDumplingId = dumplingId ?? null;
+
+    if (this.landedDumplingBuffers.length > 0 && this.landedDumplingBuffers !== this.flyBuffers) {
+      const now = this.ctx.currentTime;
+      
+      if (this.munchBufferIndex >= this.landedDumplingBuffers.length) {
+        this.munchBufferIndex = 0;
+      }
+
+      let currentBuffer = this.landedDumplingBuffers[this.munchBufferIndex];
+
+      // If offset exceeded buffer length, move to the next file
+      if (this.munchOffset >= currentBuffer.duration - 0.05) {
+        this.munchOffset = 0;
+        this.munchBufferIndex = (this.munchBufferIndex + 1) % this.landedDumplingBuffers.length;
+        currentBuffer = this.landedDumplingBuffers[this.munchBufferIndex];
+      }
+
+      const source = this.ctx.createBufferSource();
+      source.buffer = currentBuffer;
+      source.playbackRate.setValueAtTime(1.0, now);
+
+      const gainNode = this.ctx.createGain();
+      gainNode.gain.setValueAtTime(0.001, now);
+      gainNode.gain.linearRampToValueAtTime(1.0, now + 0.015);
+
+      source.connect(gainNode);
+      gainNode.connect(this.sfxGain);
+
+      this.munchStartTime = now;
+      this.activeMunchSource = source;
+      this.munchGainNode = gainNode;
+
+      source.onended = () => {
+        if (this.activeMunchSource === source) {
+          this.activeMunchSource = null;
+          this.munchGainNode = null;
+          this.munchOffset = 0;
+          this.munchBufferIndex = (this.munchBufferIndex + 1) % this.landedDumplingBuffers.length;
+        }
+      };
+
+      source.start(now, this.munchOffset);
+    } else {
+      this.playMunch();
+    }
+  }
+
+  stopDumplingMunch() {
+    if (this.activeMunchSource && this.ctx) {
+      const now = this.ctx.currentTime;
+      const elapsed = Math.max(0, now - this.munchStartTime);
+      this.munchOffset += elapsed;
+
+      const sourceToStop = this.activeMunchSource;
+      const gainToStop = this.munchGainNode;
+
+      this.activeMunchSource = null;
+      this.munchGainNode = null;
+
+      if (gainToStop) {
+        try {
+          gainToStop.gain.setValueAtTime(gainToStop.gain.value, now);
+          gainToStop.gain.linearRampToValueAtTime(0.001, now + 0.015);
+        } catch (e) {}
+      }
+
+      setTimeout(() => {
+        try {
+          sourceToStop.stop();
+          sourceToStop.disconnect();
+        } catch (e) {}
+      }, 20);
+    }
+    this.currentDumplingId = null;
   }
 
   // Play dumpling munch sound

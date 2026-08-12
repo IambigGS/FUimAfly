@@ -1,0 +1,15 @@
+## 4. Performance Optimization (60 FPS Guarantee)
+- **Shader Budget & Constraints (Mobile WebView Target):**
+  - **Post-processing:** Maximum of **1 full-screen pass**. All effects (speed lines, vignette, color tint) must be combined into a single uber-shader to avoid render target switches.
+  - **Fragment Shaders:** Limit to 2-3 texture lookups per material. Enforce `mediump` or `lowp` precision for color and UV math to maximize fill rate.
+  - **Draw Calls:** Strict limit of < 100 active draw calls per frame.
+- **Lightweight 'Macro Scale' Illusions:**
+  - **Fake DOF:** Replace real-time macro Depth of Field with a pre-blurred environment skybox/texture. 
+  - **Distance Fog:** Utilize simple Z-depth based fog to convey atmospheric perspective and scale cheaply.
+  - **Single-Pass Tilt-Shift:** Use a cheap vertical gradient blur at the top/bottom of the screen if a dynamic focus effect is strictly required.
+- **Camera Movement & Smoothing:**
+  - Interpolate camera transforms using a fixed time-step physics loop to prevent stutter during erratic turns.
+  - Use a screen-space speed lines shader instead of expensive radial motion blur.
+- **Object Culling & Asset LODs:** 
+  - Aggressively cull objects outside the fly's FOV.
+  - Use LOD models for chopsticks and pre-allocate particle systems in object pools to prevent Garbage Collection (GC) pauses.

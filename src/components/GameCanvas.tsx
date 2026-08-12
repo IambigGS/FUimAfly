@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Fly, FlyType, Particle, GameStats, ChopstickConfig, PlaytestLog, GameMode, OsuCircle } from '../types';
 import { audio, getAssetUrl } from '../utils/audio';
 import { CHOPSTICK_STYLES } from './SettingsModal';
@@ -16,8 +16,13 @@ export const isMobileOrTouchDevice = (): boolean => {
   return hasTouch || isMobileUA;
 };
 
+export interface GameCanvasHandle {
+  advanceLevelFromBonus: (bonusScore: number, flyWon: boolean) => void;
+}
+
 interface GameCanvasProps {
   isPlaying: boolean;
+  isPaused?: boolean;
   gameMode: GameMode;
   difficulty: 'easy' | 'normal' | 'hard';
   chopstickStyleId: string;
@@ -30,10 +35,13 @@ interface GameCanvasProps {
   onPlaytestComplete?: (log: PlaytestLog) => void;
   onGameEnd: (stats: GameStats) => void;
   onStatsUpdate: (stats: GameStats) => void;
+  onTriggerWaspAttack?: () => void;
+  onTriggerBeTheFly?: () => void;
 }
 
-export const GameCanvas: React.FC<GameCanvasProps> = ({
+export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
   isPlaying,
+  isPaused = false,
   gameMode,
   difficulty,
   chopstickStyleId,
@@ -46,7 +54,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   onPlaytestComplete,
   onGameEnd,
   onStatsUpdate,
-}) => {
+  onTriggerWaspAttack,
+  onTriggerBeTheFly
+}, ref) => {
   const isTouchMode = () => simulateTouch || isMobileOrTouchDevice();
   const [activeCutscene, setActiveCutscene] = useState<'intro' | 'ninja' | null>(null);
   const [isVideoBuffered, setIsVideoBuffered] = useState(false);
@@ -114,7 +124,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       totalPinches: 0,
       successfulCatches: 0,
       missedAttempts: 0,
-      catchesByType: { fruitfly: 0, housefly: 0, bluebottle: 0, ninja: 0, golden: 0 },
+      catchesByType: { fruitfly: 0, housefly: 0, bluebottle: 0, ninja: 0, golden: 0, wasp: 0 },
       frenzyTriggers: 0,
       maxCombo: 0,
       feastDamageTaken: 0,
@@ -169,6 +179,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       averageTimeBetweenCatchesSec,
       difficulty,
       viewportMode: layoutMode || 'desktop',
+      targetFps: 60,
     };
 
     try {
@@ -217,7 +228,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     combo: 0,
     maxCombo: 0,
     gameTimeRemaining: 60,
-    fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
+    fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0, wasp: 0 },
+    level: 1,
+    dumplingsLeft: 5,
+    dumplingsEatenThisLevel: 0,
+    sipNeeded: false,
   });
 
   // Dumpling Feast & Tea Sip Game State Refs
@@ -225,6 +240,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const dumplingsEatenThisLevelRef = useRef(0);
   const dumplingsEatenSinceLastDrinkRef = useRef(0);
   const sipNeededRef = useRef(false);
+
+  const isPausedRef = useRef(isPaused);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  useImperativeHandle(ref, () => ({
+    advanceLevelFromBonus: (bonusScore: number, flyWon: boolean) => {
+      statsRef.current.score += bonusScore;
+      if (flyWon) {
+        addFloatingText(window.innerWidth / 2, window.innerHeight / 3, `BE THE FLY VICTORY! +${bonusScore} BONUS 🪰🏆`, '#eab308');
+      } else if (bonusScore > 0) {
+        addFloatingText(window.innerWidth / 2, window.innerHeight / 3, `FLY BONUS! +${bonusScore} 🪰`, '#10b981');
+      }
+      currentLevelRef.current = 2;
+      initLevelDumplings(2);
+      onStatsUpdate({ ...statsRef.current });
+    }
+  }));
 
   const dumplingsRef = useRef<{
     id: string;
@@ -407,9 +441,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     let flyType: FlyType = type || types[Math.floor(Math.random() * types.length)];
     if (!type) {
       const rand = Math.random();
-      if (rand < 0.05) {
+      if (rand < 0.08) {
+        flyType = 'wasp';
+      } else if (rand < 0.15) {
         flyType = 'ninja';
-      } else if (rand < 0.12) {
+      } else if (rand < 0.25) {
         flyType = 'golden';
       }
     }
@@ -807,7 +843,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // Main animation ticks
     const renderLoop = (timestamp: DOMHighResTimeStamp = performance.now()) => {
-      if (activeCutsceneRef.current !== null) {
+      if (activeCutsceneRef.current !== null || isPausedRef.current) {
         animFrameId = requestAnimationFrame(renderLoop);
         return;
       }
@@ -840,7 +876,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const rw = releaseWindowRef.current;
         
         if (state === 'IDLE' || state === 'TARGETING') {
-          const target = fliesRef.current.find(f => !f.isCaught && f.state === 'active' && f.type !== 'ninja');
+          const target = fliesRef.current.find(f => !f.isCaught && (f.state === 'flying' || f.state === 'hovering') && f.type !== 'ninja');
           if (target) {
             goldenSweepTargetFlyRef.current = target;
             goldenSweepStateRef.current = 'CATCHING';
@@ -851,7 +887,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           }
         } else if (state === 'CATCHING' && goldenSweepTargetFlyRef.current) {
           const target = goldenSweepTargetFlyRef.current;
-          if (target.isCaught || target.state !== 'active') {
+          if (target.isCaught || (target.state !== 'flying' && target.state !== 'hovering')) {
             goldenSweepStateRef.current = 'TARGETING';
           } else {
             mouseRef.current.x += (target.x - mouseRef.current.x) * 0.25;
@@ -2387,6 +2423,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       if (soundEnabled) {
         audio.playClack();
       }
+
+      // If a WASP was caught, trigger the 3D Head-On Wasp Attack mode!
+      if (fly.type === 'wasp' && onTriggerWaspAttack) {
+        onTriggerWaspAttack();
+      }
       
       // Auto-Release the fly instantly (as requested for PC controls)
       releaseFlyToFreedom(fly);
@@ -2641,10 +2682,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             if (remaining === 0) {
               if (soundEnabled) audio.playSfx('levelup');
               addFloatingText(window.innerWidth / 2, window.innerHeight / 3, `LEVEL ${lvl} COMPLETE! 🏆`, '#eab308');
-              currentLevelRef.current++;
-              setTimeout(() => {
-                initLevelDumplings(currentLevelRef.current);
-              }, 800);
+              
+              if (lvl === 1 && onTriggerBeTheFly) {
+                setTimeout(() => {
+                  onTriggerBeTheFly();
+                }, 1000);
+              } else {
+                currentLevelRef.current++;
+                setTimeout(() => {
+                  initLevelDumplings(currentLevelRef.current);
+                }, 800);
+              }
             }
           }
         }
@@ -2900,7 +2948,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       combo: 0,
       maxCombo: 0,
       gameTimeRemaining: 0,
-      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
+      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0, wasp: 0 },
       level: 1,
       dumplingsLeft: 5,
       dumplingsEatenThisLevel: 0,
@@ -2938,7 +2986,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           if (unblockedDumplings.length > 0) {
             const targetDumpling = unblockedDumplings[Math.floor(Math.random() * unblockedDumplings.length)];
             targetDumpling.flyId = targetFly.id;
-            targetDumpling.landingTargetId = targetDumpling.id;
+            targetFly.landingTargetId = targetDumpling.id;
           }
         }
       }
@@ -3030,4 +3078,4 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       )}
     </div>
   );
-};
+});

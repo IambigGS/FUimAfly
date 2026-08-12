@@ -24,12 +24,16 @@ import {
   Target,
   Menu,
   Maximize2,
-  Sparkles
+  Sparkles,
+  ShieldAlert
 } from 'lucide-react';
 import { DojoBackground } from './components/DojoBackground';
 import NinjaOverlayCanvas, { NinjaOverlayHandle } from './components/NinjaOverlayCanvas';
 import NinjaSurpriseModal from './components/NinjaSurpriseModal';
-import { GameCanvas } from './components/GameCanvas';
+import { GameCanvas, GameCanvasHandle } from './components/GameCanvas';
+import TeamHub from './components/TeamHub';
+import WaspAttackCanvas from './components/WaspAttackCanvas';
+import { BeTheFlyCanvas } from './components/BeTheFlyCanvas';
 import { HowToPlay } from './components/HowToPlay';
 import { SettingsModal, CHOPSTICK_STYLES } from './components/SettingsModal';
 import { audio } from './utils/audio';
@@ -37,8 +41,10 @@ import { GameMode, GameStats, FlyType, PlaytestLog } from './types';
 
 export default function App() {
   // Navigation & Screens
-  const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover'>('menu');
+  const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover' | 'team_hub' | 'wasp_attack' | 'be_the_fly'>('menu');
   const [gameMode, setGameMode] = useState<GameMode>('arcade');
+  const gameCanvasRef = useRef<GameCanvasHandle>(null);
+  const [isBeTheFlyOverlayActive, setIsBeTheFlyOverlayActive] = useState(false);
 
   // Playtest Telemetry System (for Sid & Scott)
   const [isPlaytestMode, setIsPlaytestMode] = useState(false);
@@ -122,7 +128,11 @@ export default function App() {
     combo: 0,
     maxCombo: 0,
     gameTimeRemaining: 60,
-    fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
+    fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0, wasp: 0 },
+    level: 1,
+    dumplingsLeft: 5,
+    dumplingsEatenThisLevel: 0,
+    sipNeeded: false,
   });
 
   // Historical High Scores (Loaded from localStorage)
@@ -259,7 +269,7 @@ export default function App() {
       combo: 0,
       maxCombo: 0,
       gameTimeRemaining: 0,
-      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
+      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0, wasp: 0 },
       level: 1,
       dumplingsLeft: 5,
       dumplingsEatenThisLevel: 0,
@@ -279,7 +289,7 @@ export default function App() {
       combo: 0,
       maxCombo: 0,
       gameTimeRemaining: 180,
-      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0 },
+      fliesTypeCount: { housefly: 0, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0, wasp: 0 },
       level: 1,
       dumplingsLeft: 5,
       dumplingsEatenThisLevel: 0,
@@ -501,6 +511,48 @@ export default function App() {
                       <div className="w-full py-2.5 bg-brand-red text-white border-2 border-brand-charcoal font-serif font-black text-xs md:text-sm text-center tracking-wider uppercase group-hover:bg-brand-charcoal transition-colors shadow-[2px_2px_0px_0px_#1A1A1A] flex items-center justify-center gap-2">
                         <Play className="w-4 h-4 fill-current" /> Start Game Now
                       </div>
+                    </button>
+
+                    {/* Team Hub Button */}
+                    <button
+                      onClick={() => setGameState('team_hub')}
+                      id="team-hub-btn"
+                      className={`w-full text-left p-3 rounded-none border-3 border-brand-charcoal bg-white hover:bg-brand-ivory hover:shadow-[5px_5px_0px_0px_#1A1A1A] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-center justify-between gap-2`}
+                    >
+                      <span className="font-serif font-black text-brand-charcoal group-hover:text-brand-red flex items-center gap-2 transition-colors text-xs md:text-sm">
+                        🧑‍💻 View Team Hub
+                      </span>
+                      <span className="p-1.5 border-2 border-brand-charcoal rounded-none bg-brand-charcoal text-white transition-colors flex-shrink-0 flex items-center justify-center">
+                        <Target className="w-4 h-4 fill-current" />
+                      </span>
+                    </button>
+
+                    {/* Wasp Attack Mode Dev Button */}
+                    <button
+                      onClick={() => setGameState('wasp_attack')}
+                      id="wasp-attack-btn"
+                      className={`w-full text-left p-3 rounded-none border-3 border-amber-700 bg-amber-50 hover:bg-amber-100 hover:shadow-[5px_5px_0px_0px_#B45309] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-center justify-between gap-2`}
+                    >
+                      <span className="font-serif font-black text-amber-950 group-hover:text-amber-700 flex items-center gap-2 transition-colors text-xs md:text-sm uppercase tracking-wider">
+                        🐝 Launch Wasp Attack Mode
+                      </span>
+                      <span className="p-1.5 border-2 border-amber-950 rounded-none bg-amber-500 text-amber-950 font-mono font-bold text-xs">
+                        3D WASP POV
+                      </span>
+                    </button>
+
+                    {/* Be the Fly Mode Dev Button */}
+                    <button
+                      onClick={() => setGameState('be_the_fly')}
+                      id="be-the-fly-btn"
+                      className={`w-full text-left p-3 rounded-none border-3 border-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:shadow-[5px_5px_0px_0px_#065F46] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-center justify-between gap-2`}
+                    >
+                      <span className="font-serif font-black text-emerald-950 group-hover:text-emerald-700 flex items-center gap-2 transition-colors text-xs md:text-sm uppercase tracking-wider">
+                        🪰 Launch "Be the Fly" Mode
+                      </span>
+                      <span className="p-1.5 border-2 border-emerald-950 rounded-none bg-emerald-500 text-white font-mono font-bold text-xs animate-pulse">
+                        NEW FLY POV 🪰
+                      </span>
                     </button>
                   </div>
 
@@ -844,7 +896,9 @@ export default function App() {
             {/* Main Interactive High FPS Game Canvas Stage */}
             <div className="flex-1 relative bg-transparent overflow-hidden shadow-inner">
               <GameCanvas
+                ref={gameCanvasRef}
                 isPlaying={gameState === 'playing'}
+                isPaused={isBeTheFlyOverlayActive}
                 gameMode={gameMode}
                 difficulty={difficulty}
                 chopstickStyleId={selectedChopstickId}
@@ -857,7 +911,26 @@ export default function App() {
                 onPlaytestComplete={handlePlaytestComplete}
                 onGameEnd={handleGameEnd}
                 onStatsUpdate={setStats}
+                onTriggerWaspAttack={() => setGameState('wasp_attack')}
+                onTriggerBeTheFly={() => setIsBeTheFlyOverlayActive(true)}
               />
+              {isBeTheFlyOverlayActive && (
+                <div className="absolute inset-0 z-50">
+                  <BeTheFlyCanvas
+                    soundEnabled={soundEnabled}
+                    targetFps={targetFps}
+                    onExit={() => {
+                      setIsBeTheFlyOverlayActive(false);
+                      gameCanvasRef.current?.advanceLevelFromBonus(0, false);
+                    }}
+                    onComplete={(finalStats) => {
+                      setIsBeTheFlyOverlayActive(false);
+                      const bonus = finalStats.won ? 5000 + finalStats.score : finalStats.score;
+                      gameCanvasRef.current?.advanceLevelFromBonus(bonus, !!finalStats.won);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -979,9 +1052,50 @@ export default function App() {
             </div>
           </motion.div>
         )}
+
+        {/* === SCREEN D: TEAM HUB === */}
+        {gameState === 'team_hub' && (
+          <TeamHub onClose={() => setGameState('menu')} />
+        )}
+
+        {/* === SCREEN E: WASP ATTACK 3D POV === */}
+        {gameState === 'wasp_attack' && (
+          <WaspAttackCanvas
+            soundEnabled={soundEnabled}
+            onComplete={(success) => {
+              setGameState(success ? 'playing' : 'gameover');
+            }}
+          />
+        )}
+
+        {/* === SCREEN F: BE THE FLY MODE === */}
+        {gameState === 'be_the_fly' && (
+          <BeTheFlyCanvas
+            soundEnabled={soundEnabled}
+            targetFps={targetFps}
+            onExit={() => setGameState('menu')}
+            onComplete={(finalStats) => {
+              setStats({
+                score: finalStats.score,
+                fliesCaught: 0,
+                totalAttempts: 0,
+                accuracy: 100,
+                combo: 0,
+                maxCombo: 0,
+                gameTimeRemaining: finalStats.timeSurvived,
+                fliesTypeCount: { housefly: 1, bluebottle: 0, fruitfly: 0, golden: 0, ninja: 0, wasp: 0 },
+                level: 1,
+                dumplingsLeft: 5 - finalStats.dumplingsEaten,
+                dumplingsEatenThisLevel: finalStats.dumplingsEaten,
+                sipNeeded: false,
+              });
+              setGameState('gameover');
+            }}
+          />
+        )}
       </AnimatePresence>
 
-      {/* 4. MODALS & POPUPS */}
+      {/* Persistent UI Overlays */}
       <AnimatePresence>
         {/* Tutorial / Help Dialog */}
         {showTutorial && <HowToPlay onClose={() => setShowTutorial(false)} />}

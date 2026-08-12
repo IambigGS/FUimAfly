@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-export type GameMode = 'arcade' | 'zen' | 'training' | 'rhythm';
+export type GameMode = 'arcade' | 'zen' | 'training' | 'rhythm' | 'be_the_fly';
 
 export interface OsuCircle {
   id: string;
@@ -19,7 +19,7 @@ export interface OsuCircle {
   resultTime?: number;
 }
 
-export type FlyType = 'housefly' | 'bluebottle' | 'fruitfly' | 'golden' | 'ninja';
+export type FlyType = 'housefly' | 'bluebottle' | 'fruitfly' | 'golden' | 'ninja' | 'wasp';
 
 export interface Fly {
   id: string;

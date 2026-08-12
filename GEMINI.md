@@ -8,6 +8,9 @@ When engaging multiple subagents for a task, you MUST follow this iterative prot
 
 1. **Initial Engagement & PRD Generation**:
    Assign each subagent their specific domain task. Instruct them that their primary output should be a Product Requirements Document (PRD) or detailed proposal file, rather than immediately writing code.
+   - **Crucial Formatting Rules for Agents**:
+     - ALL proposal/PRD filenames MUST be prefixed with a timestamp in `YYYY-MM-DD-HHMM-` format (e.g., `2024-05-20-1430-munch_resume_proposal.md`) so they can be sorted chronologically in the Team Hub.
+     - ALL proposals MUST start with a brief, plain-English "TL;DR" opening statement summarizing the conclusion (e.g., "Yes, that is possible, but there are potential issues as listed below..."). This is for the user who prefers brief, high-level summaries before reading dense technical details.
 2. **Consolidation & Conflict Checking**:
    The lead agent will review all generated PRDs. The lead agent must consolidate these plans and check for cross-domain conflicts (e.g., UI conflicting with audio, or performance constraints).
 3. **Re-Consultation**:
