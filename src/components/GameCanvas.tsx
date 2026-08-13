@@ -35,7 +35,6 @@ interface GameCanvasProps {
   onPlaytestComplete?: (log: PlaytestLog) => void;
   onGameEnd: (stats: GameStats) => void;
   onStatsUpdate: (stats: GameStats) => void;
-  onTriggerWaspAttack?: () => void;
   onTriggerBeTheFly?: () => void;
 }
 
@@ -54,8 +53,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
   onPlaytestComplete,
   onGameEnd,
   onStatsUpdate,
-  onTriggerWaspAttack,
-  onTriggerBeTheFly
+  onTriggerBeTheFly,
 }, ref) => {
   const isTouchMode = () => simulateTouch || isMobileOrTouchDevice();
   const [activeCutscene, setActiveCutscene] = useState<'intro' | 'ninja' | null>(null);
@@ -2422,11 +2420,6 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       // Trigger crisp capture clack
       if (soundEnabled) {
         audio.playClack();
-      }
-
-      // If a WASP was caught, trigger the 3D Head-On Wasp Attack mode!
-      if (fly.type === 'wasp' && onTriggerWaspAttack) {
-        onTriggerWaspAttack();
       }
       
       // Auto-Release the fly instantly (as requested for PC controls)

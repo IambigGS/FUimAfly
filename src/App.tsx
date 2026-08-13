@@ -32,7 +32,6 @@ import NinjaOverlayCanvas, { NinjaOverlayHandle } from './components/NinjaOverla
 import NinjaSurpriseModal from './components/NinjaSurpriseModal';
 import { GameCanvas, GameCanvasHandle } from './components/GameCanvas';
 import TeamHub from './components/TeamHub';
-import WaspAttackCanvas from './components/WaspAttackCanvas';
 import { BeTheFlyCanvas } from './components/BeTheFlyCanvas';
 import { HowToPlay } from './components/HowToPlay';
 import { SettingsModal, CHOPSTICK_STYLES } from './components/SettingsModal';
@@ -41,7 +40,7 @@ import { GameMode, GameStats, FlyType, PlaytestLog } from './types';
 
 export default function App() {
   // Navigation & Screens
-  const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover' | 'team_hub' | 'wasp_attack' | 'be_the_fly'>('menu');
+  const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover' | 'team_hub' | 'be_the_fly'>('menu');
   const [gameMode, setGameMode] = useState<GameMode>('arcade');
   const gameCanvasRef = useRef<GameCanvasHandle>(null);
   const [isBeTheFlyOverlayActive, setIsBeTheFlyOverlayActive] = useState(false);
@@ -527,20 +526,6 @@ export default function App() {
                       </span>
                     </button>
 
-                    {/* Wasp Attack Mode Dev Button */}
-                    <button
-                      onClick={() => setGameState('wasp_attack')}
-                      id="wasp-attack-btn"
-                      className={`w-full text-left p-3 rounded-none border-3 border-amber-700 bg-amber-50 hover:bg-amber-100 hover:shadow-[5px_5px_0px_0px_#B45309] active:translate-x-0 active:translate-y-0 active:shadow-none transition-all duration-150 cursor-pointer group flex items-center justify-between gap-2`}
-                    >
-                      <span className="font-serif font-black text-amber-950 group-hover:text-amber-700 flex items-center gap-2 transition-colors text-xs md:text-sm uppercase tracking-wider">
-                        🐝 Launch Wasp Attack Mode
-                      </span>
-                      <span className="p-1.5 border-2 border-amber-950 rounded-none bg-amber-500 text-amber-950 font-mono font-bold text-xs">
-                        3D WASP POV
-                      </span>
-                    </button>
-
                     {/* Be the Fly Mode Dev Button */}
                     <button
                       onClick={() => setGameState('be_the_fly')}
@@ -911,7 +896,6 @@ export default function App() {
                 onPlaytestComplete={handlePlaytestComplete}
                 onGameEnd={handleGameEnd}
                 onStatsUpdate={setStats}
-                onTriggerWaspAttack={() => setGameState('wasp_attack')}
                 onTriggerBeTheFly={() => setIsBeTheFlyOverlayActive(true)}
               />
               {isBeTheFlyOverlayActive && (
@@ -1058,17 +1042,7 @@ export default function App() {
           <TeamHub onClose={() => setGameState('menu')} />
         )}
 
-        {/* === SCREEN E: WASP ATTACK 3D POV === */}
-        {gameState === 'wasp_attack' && (
-          <WaspAttackCanvas
-            soundEnabled={soundEnabled}
-            onComplete={(success) => {
-              setGameState(success ? 'playing' : 'gameover');
-            }}
-          />
-        )}
-
-        {/* === SCREEN F: BE THE FLY MODE === */}
+        {/* === SCREEN E: BE THE FLY MODE === */}
         {gameState === 'be_the_fly' && (
           <BeTheFlyCanvas
             soundEnabled={soundEnabled}

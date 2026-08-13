@@ -6,9 +6,10 @@ interface TeamHubProps {
   onClose: () => void;
 }
 
-type AgentName = 'luna' | 'echo' | 'atlas' | 'doc' | 'scott';
+type AgentName = 'all' | 'luna' | 'echo' | 'atlas' | 'doc' | 'scott';
 
 const agents: { id: AgentName; name: string; role: string; icon: React.ReactNode; color: string }[] = [
+  { id: 'all', name: 'Latest Feed', role: 'All Chronological Updates', icon: <span>⚡</span>, color: 'text-brand-red border-brand-red' },
   { id: 'luna', name: 'Luna', role: 'Lead Art & UI (Visuals)', icon: <Target className="w-5 h-5" />, color: 'text-pink-500 border-pink-500' },
   { id: 'echo', name: 'Echo', role: 'Audio Engineer (Sounds)', icon: <Music className="w-5 h-5" />, color: 'text-purple-500 border-purple-500' },
   { id: 'atlas', name: 'Atlas', role: 'Performance Master', icon: <Monitor className="w-5 h-5" />, color: 'text-blue-500 border-blue-500' },
@@ -17,7 +18,7 @@ const agents: { id: AgentName; name: string; role: string; icon: React.ReactNode
 ];
 
 export const TeamHub: React.FC<TeamHubProps> = ({ onClose }) => {
-  const [activeTab, setActiveTab] = useState<AgentName>('luna');
+  const [activeTab, setActiveTab] = useState<AgentName>('all');
 
   // Load all markdown files dynamically as raw strings
   const mdFiles = useMemo(() => {
@@ -49,24 +50,36 @@ export const TeamHub: React.FC<TeamHubProps> = ({ onClose }) => {
     return files;
   }, []);
 
-  // Filter markdown files by active agent tab and sort descending
+  // Filter markdown files by active agent tab and sort descending (newest timestamp first)
   const agentMdFiles = useMemo(() => {
-    const files = Object.keys(mdFiles).filter(path => path.toLowerCase().includes(`/${activeTab}/`));
-    files.sort((a, b) => b.localeCompare(a));
+    const files = Object.keys(mdFiles).filter(path => activeTab === 'all' || path.toLowerCase().includes(`/${activeTab}/`));
+    files.sort((a, b) => {
+      const filenameA = a.split('/').pop() || '';
+      const filenameB = b.split('/').pop() || '';
+      return filenameB.localeCompare(filenameA);
+    });
     return files;
   }, [mdFiles, activeTab]);
 
   // Filter image files by active agent tab and sort descending
   const agentImages = useMemo(() => {
-    const files = Object.keys(imageFiles).filter(path => path.toLowerCase().includes(`/${activeTab}/`));
-    files.sort((a, b) => b.localeCompare(a));
+    const files = Object.keys(imageFiles).filter(path => activeTab === 'all' || path.toLowerCase().includes(`/${activeTab}/`));
+    files.sort((a, b) => {
+      const filenameA = a.split('/').pop() || '';
+      const filenameB = b.split('/').pop() || '';
+      return filenameB.localeCompare(filenameA);
+    });
     return files;
   }, [imageFiles, activeTab]);
 
   // Filter audio files by active agent tab and sort descending
   const agentAudio = useMemo(() => {
-    const files = Object.keys(audioFiles).filter(path => path.toLowerCase().includes(`/${activeTab}/`));
-    files.sort((a, b) => b.localeCompare(a));
+    const files = Object.keys(audioFiles).filter(path => activeTab === 'all' || path.toLowerCase().includes(`/${activeTab}/`));
+    files.sort((a, b) => {
+      const filenameA = a.split('/').pop() || '';
+      const filenameB = b.split('/').pop() || '';
+      return filenameB.localeCompare(filenameA);
+    });
     return files;
   }, [audioFiles, activeTab]);
 
