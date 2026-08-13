@@ -47,9 +47,11 @@ export interface Fly {
   isCatchable?: boolean;
   narrativeStartTime?: number;
   landingTargetId?: string;
-  landingType?: 'dumpling' | 'tea' | 'none';
   landedTime?: number;
   buzzLoopTimer?: number;
+  behavior?: 'roam' | 'orbit_head';
+  landingType?: 'dumpling' | 'tea' | 'none';
+  evasionCooldown?: number;
 }
 
 export interface Particle {

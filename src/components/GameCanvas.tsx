@@ -1651,6 +1651,23 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
           }
         }
 
+        // SWARM BEHAVIOR: Orbit Master Steve's head in background
+        if (fly.behavior === 'orbit_head') {
+          const headX = canvas.width * 0.5;
+          const headY = canvas.height * 0.28;
+          const distToHead = getDistance(fly.x, fly.y, headX, headY);
+          const angleToHead = Math.atan2(headY - fly.y, headX - fly.x);
+          const orbitAngle = angleToHead + Math.PI / 2;
+          
+          if (distToHead > 70) {
+            fly.vx += (Math.cos(angleToHead) * 0.8 + Math.cos(orbitAngle) * 0.3) * speedMultiplier;
+            fly.vy += (Math.sin(angleToHead) * 0.8 + Math.sin(orbitAngle) * 0.3) * speedMultiplier;
+          } else {
+            fly.vx += Math.cos(orbitAngle) * 0.6 * speedMultiplier;
+            fly.vy += Math.sin(orbitAngle) * 0.6 * speedMultiplier;
+          }
+        }
+
         // Apply friction/drag to keep velocities bounded
         const drag = fly.state === 'escaping' ? 0.94 : 0.88;
         fly.vx *= drag;
@@ -2394,11 +2411,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
 
     if (caughtFlyIndex !== -1) {
       const fly = flies[caughtFlyIndex];
-      fly.isCaught = true;
-      fly.caughtTime = Date.now();
-      fly.state = 'flying';
 
-      // Unblock food or soda glass instantly when fly is caught!
+      // Unblock food or soda glass instantly when fly is struck!
       if (fly.landingTargetId) {
         if (fly.landingTargetId === 'tea') {
           teaRef.current.isBlockedByFly = false;
@@ -2413,17 +2427,43 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
         fly.landingTargetId = undefined;
       }
 
-      // Sparkle Splashes
-      createCaptureParticles(fly.x, fly.y, fly.color, 12);
-      createCaptureParticles(fly.x, fly.y, 'rgba(255, 255, 255, 0.9)', 8);
+      const isDumplingOrHeadFly = fly.landingType === 'dumpling' || fly.behavior === 'orbit_head';
 
-      // Trigger crisp capture clack
-      if (soundEnabled) {
-        audio.playClack();
+      if (!isDumplingOrHeadFly && (!fly.evasionCooldown || fly.evasionCooldown < Date.now())) {
+        // FLY EVASION MECHANIC: Twitch-dodge away from tap!
+        fly.evasionCooldown = Date.now() + 600;
+        fly.vx += (fly.x - hitX) * 0.8;
+        fly.vy += (fly.y - hitY) * 0.8;
+        createCaptureParticles(fly.x, fly.y, 'rgba(56, 189, 248, 0.8)', 6);
+        addFloatingText(hitX, hitY - 20, 'Zip! 💨', '#38bdf8');
+        if (soundEnabled) {
+          audio.playSfx('escape');
+        }
+      } else if (!isDumplingOrHeadFly) {
+        // WAFT MECHANIC: Shoo mid-air / tea fly up to Master Steve's head!
+        fly.behavior = 'orbit_head';
+        fly.landingType = 'none';
+        fly.state = 'flying';
+        createCaptureParticles(fly.x, fly.y, '#fef08a', 8);
+        addFloatingText(hitX, hitY - 20, 'Wafted! 🥢', '#eab308');
+        if (soundEnabled) {
+          audio.playClack();
+        }
+      } else {
+        // DUMPLING & HEAD RELEASE: Release fly out the window for score!
+        fly.isCaught = true;
+        fly.caughtTime = Date.now();
+        fly.state = 'flying';
+
+        createCaptureParticles(fly.x, fly.y, fly.color, 12);
+        createCaptureParticles(fly.x, fly.y, 'rgba(255, 255, 255, 0.9)', 8);
+
+        if (soundEnabled) {
+          audio.playClack();
+        }
+
+        releaseFlyToFreedom(fly);
       }
-      
-      // Auto-Release the fly instantly (as requested for PC controls)
-      releaseFlyToFreedom(fly);
     } else {
       // Strike Miss
       stats.combo = 0;
