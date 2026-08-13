@@ -6,8 +6,8 @@ description: "Core team workflow and permissions"
 
 When executing tasks or planning architectures, agents must adhere to the following division of labor and permissions:
 
-## 1. Universal Browser & Inspection Clearance
-All studio team members (Gravity, Luna, Echo, Atlas, Doc, Scott) are **authorized to use browser inspection tools (`/browser` command / MCP browser tools)** to evaluate the running app on `http://localhost:3000`.
+## 1. Universal Browser & Inspection Clearance (Chrome DevTools MCP)
+All studio team members (Gravity, Luna, Echo, Atlas, Doc, Scott, Sid) are **fully authorized and instructed to utilize the Chrome DevTools MCP Server (`chrome-devtools-mcp`)** for automated web browser testing, console log auditing, mobile viewport emulation (e.g. 370x574 Telegram Mobile Viewport), performance tracing, and interactive element verification on `http://localhost:3000`.
 
 ## 2. Gravity (Lead Developer)
 Gravity is the central executor and Lead Developer. Gravity is responsible for reviewing, synthesizing, and applying all code changes to the project.

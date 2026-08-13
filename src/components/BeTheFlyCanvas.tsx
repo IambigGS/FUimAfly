@@ -208,6 +208,8 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
 
   // Handle Touch Inputs for Virtual Joystick and Action Buttons
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.cancelable) e.preventDefault();
+
     if (gameState === 'onboarding') {
       setGameState('playing');
       return;
@@ -232,12 +234,17 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
         joystickTouchId.current = touch.identifier;
         joystickStart.current = { x, y };
         joystickCurrent.current = { x, y };
+      } else {
+        // Direct Touch Target on Canvas (Right side / direct tap)
+        const normX = Math.max(-0.85, Math.min(0.85, (x / rect.width) * 2 - 1));
+        const normY = Math.max(-0.85, Math.min(0.85, (y / rect.height) * 2 - 1));
+        mouseTargetRef.current = { x: normX, y: normY };
       }
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (joystickTouchId.current === null) return;
+    if (e.cancelable) e.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -248,11 +255,19 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
         joystickCurrent.current = { x, y };
+      } else {
+        // Direct Touch Drag
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        const normX = Math.max(-0.85, Math.min(0.85, (x / rect.width) * 2 - 1));
+        const normY = Math.max(-0.85, Math.min(0.85, (y / rect.height) * 2 - 1));
+        mouseTargetRef.current = { x: normX, y: normY };
       }
     }
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.cancelable) e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       if (touch.identifier === joystickTouchId.current) {
@@ -328,13 +343,21 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
         if (keysPressed.current['KeyW'] || keysPressed.current['ArrowUp']) moveY -= 1;
         if (keysPressed.current['KeyS'] || keysPressed.current['ArrowDown']) moveY += 1;
 
-        // Joystick Controls
+        // Joystick Controls (Tuned 8px deadzone & 90px maxDist response curve)
         if (joystickStart.current && joystickCurrent.current) {
           const dx = joystickCurrent.current.x - joystickStart.current.x;
           const dy = joystickCurrent.current.y - joystickStart.current.y;
-          const maxDist = 50;
-          moveX = Math.max(-1, Math.min(1, dx / maxDist));
-          moveY = Math.max(-1, Math.min(1, dy / maxDist));
+          const dist = Math.hypot(dx, dy);
+          const deadzone = 8;
+          const maxDist = 90;
+
+          if (dist > deadzone) {
+            const activeDist = Math.min(maxDist, dist - deadzone);
+            const normDist = activeDist / (maxDist - deadzone);
+            const scaledMagnitude = Math.pow(normDist, 1.2); // Smooth response curve
+            moveX = (dx / dist) * scaledMagnitude;
+            moveY = (dy / dist) * scaledMagnitude;
+          }
         }
 
         // Mouse Steering Controls
@@ -739,7 +762,7 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onMouseMove={handleMouseMove}
-        className="w-full h-full block cursor-crosshair"
+        className="w-full h-full block cursor-crosshair touch-none"
       />
 
       {/* Minimalist Top HUD Header */}
