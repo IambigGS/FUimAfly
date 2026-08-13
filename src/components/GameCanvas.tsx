@@ -702,9 +702,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     stats.score += pointEarned;
 
     // Beautiful sparkles at the release moment!
-    const rw = releaseWindowRef.current;
     createCaptureParticles(fly.x, fly.y, '#fef08a', 15); // golden sparkles
-    createCaptureParticles(rw.x, rw.y, 'rgba(244, 180, 194, 0.9)', 12); // cherry blossom pink sparkles
 
     // Trigger Floating typography
     const comboText = comboMult > 1 ? ` (x${comboMult} Combo!)` : '';
@@ -1806,6 +1804,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       fliesRef.current = fliesRef.current.filter((fly) => {
         if (fly.state === 'releasing' && fly.size < 1.5) {
           replacementsToSpawn++;
+          createCaptureParticles(fly.x, fly.y, 'rgba(244, 180, 194, 0.9)', 12);
           return false;
         }
         return true;
@@ -2524,8 +2523,6 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
 
   const triggerFrenzy = () => {
     setFrenzyActive(true);
-    isGoldenSweepActiveRef.current = true;
-    goldenSweepStateRef.current = 'TARGETING';
     addFloatingText(window.innerWidth / 2, window.innerHeight / 3, 'GOLDEN FRENZY TIME!', '#eab308');
     
     if (soundEnabled) {
@@ -2549,7 +2546,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
 
   // PC Mouse Handlers for Dragging Dumplings/Tea & Pinching Chopsticks
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive) return;
+    if (!isPlaying || cutsceneActive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -2567,7 +2564,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       for (let i = 0; i < dumplings.length; i++) {
         const d = dumplings[i];
         if (!d.isEaten && getDistance(mx, my, d.x, d.y) <= 40) {
-          if (!d.isBlockedByFly) {
+          if (d.isBlockedByFly) {
+            performPinchStrike(e.clientX, e.clientY);
+            return;
+          } else {
             dragItemRef.current = { type: 'dumpling', id: d.id, index: i, startX: mx, startY: my };
             return;
           }
@@ -2577,45 +2577,17 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       // 2. Check if touching Soda Tumbler/Tea
       const tea = teaRef.current;
       if (getDistance(mx, my, tea.x, tea.y) <= 55) {
-        if (!tea.isBlockedByFly) {
+        if (tea.isBlockedByFly) {
+          performPinchStrike(e.clientX, e.clientY);
+          return;
+        } else {
           dragItemRef.current = { type: 'tea', startX: mx, startY: my };
           return;
         }
       }
 
-      // 3. Otherwise try to catch a fly
-      if (autoCaptureRef.current?.active) return;
-
-      const hitRadius = getDifficultySettings().hitRadius * 1.5;
-      const nearbyFly = fliesRef.current.find((f) => {
-        if (f.state === 'releasing' || f.isCaught) return false;
-        return getDistance(mx, my, f.x, f.y) <= hitRadius;
-      });
-
-      if (nearbyFly) {
-        if (nearbyFly.type === 'ninja' && nearbyFly.isCatchable === false) {
-          if (soundEnabled) {
-            audio.playClack();
-            audio.playSfx('escape');
-          }
-          addFloatingText(mx, my, "Too Fast! ⚡", "#a855f7");
-        } else {
-          autoCaptureRef.current = {
-            active: true,
-            phase: 'approaching',
-            flyId: nearbyFly.id,
-            startTime: Date.now(),
-            startPos: { x: canvas.width / 2, y: canvas.height + 80 },
-            targetPos: { x: nearbyFly.x, y: nearbyFly.y },
-          };
-        }
-      } else {
-        if (soundEnabled) {
-          audio.playClack();
-          audio.playSfx('complain');
-        }
-        addFloatingText(mx, my, "Miss!", "rgba(200, 180, 140, 0.7)");
-      }
+      // 3. Otherwise try to catch a fly instantly (no autoCapture delays for manic tapping)
+      performPinchStrike(e.clientX, e.clientY);
       return;
     }
 
@@ -2750,7 +2722,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive) return;
+    if (!isPlaying || cutsceneActive) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -2796,7 +2768,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
 
   // Touch handlers for mobile players (Tap-to-Catch)
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive || e.touches.length === 0) return;
+    if (!isPlaying || cutsceneActive || e.touches.length === 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -2813,7 +2785,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       for (let i = 0; i < dumplings.length; i++) {
         const d = dumplings[i];
         if (!d.isEaten && getDistance(touchX, touchY, d.x, d.y) <= 40) {
-          if (!d.isBlockedByFly) {
+          if (d.isBlockedByFly) {
+            performPinchStrike(touch.clientX, touch.clientY);
+            return;
+          } else {
             dragItemRef.current = { type: 'dumpling', id: d.id, index: i, startX: touchX, startY: touchY };
             mouseRef.current.x = touchX;
             mouseRef.current.y = touchY;
@@ -2825,7 +2800,10 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       // 2. Check if touching Soda Tumbler/Tea
       const tea = teaRef.current;
       if (getDistance(touchX, touchY, tea.x, tea.y) <= 55) {
-        if (!tea.isBlockedByFly) {
+        if (tea.isBlockedByFly) {
+          performPinchStrike(touch.clientX, touch.clientY);
+          return;
+        } else {
           dragItemRef.current = { type: 'tea', startX: touchX, startY: touchY };
           mouseRef.current.x = touchX;
           mouseRef.current.y = touchY;
@@ -2833,48 +2811,15 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
         }
       }
 
-      // 3. Otherwise try to catch a fly
-      // If chopsticks are currently carrying out an auto capture sequence, block tap
-      if (autoCaptureRef.current?.active) return;
-
-      // Search for flies near tap coordinate (1.5x hit radius for finger tap)
-      const hitRadius = getDifficultySettings().hitRadius * 1.5;
-      const nearbyFly = fliesRef.current.find((f) => {
-        if (f.state === 'releasing' || f.isCaught) return false;
-        return getDistance(touchX, touchY, f.x, f.y) <= hitRadius;
-      });
-
-      if (nearbyFly) {
-        if (nearbyFly.type === 'ninja' && nearbyFly.isCatchable === false) {
-          if (soundEnabled) {
-            audio.playClack();
-            audio.playSfx('escape');
-          }
-          addFloatingText(touchX, touchY, "Too Fast! ⚡", "#a855f7");
-        } else {
-          autoCaptureRef.current = {
-            active: true,
-            phase: 'approaching',
-            flyId: nearbyFly.id,
-            startTime: Date.now(),
-            startPos: { x: canvas.width / 2, y: canvas.height + 80 },
-            targetPos: { x: nearbyFly.x, y: nearbyFly.y },
-          };
-        }
-      } else {
-        if (soundEnabled) {
-          audio.playClack();
-          audio.playSfx('complain');
-        }
-        addFloatingText(touchX, touchY, "Miss!", "rgba(200, 180, 140, 0.7)");
-      }
+      // 3. Otherwise try to catch a fly instantly (no delays for manic tapping)
+      performPinchStrike(touch.clientX, touch.clientY);
     } else {
       performPinchStrike(touch.clientX, touch.clientY);
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive || e.touches.length === 0) return;
+    if (!isPlaying || cutsceneActive || e.touches.length === 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -2900,14 +2845,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!isPlaying || isGoldenSweepActiveRef.current || cutsceneActive) return;
-    if (!isTouchMode()) {
-      handleReleasePinch();
-    } else {
-      if (dragItemRef.current) {
-        handleDropOrRelease();
-      }
+    if (!isPlaying || cutsceneActive) return;
+    if (dragItemRef.current) {
+      handleDropOrRelease();
     }
+    handleReleasePinch();
   };
 
   // Desktop Keyboard Controls (WASD / Arrow Keys for movement, Space for pinch/strike)

@@ -37,12 +37,28 @@ import { HowToPlay } from './components/HowToPlay';
 import { SettingsModal, CHOPSTICK_STYLES } from './components/SettingsModal';
 import { audio } from './utils/audio';
 import { GameMode, GameStats, FlyType, PlaytestLog } from './types';
+import { APP_VERSION, LAST_UPDATE_TIMESTAMP, BUILD_INFO } from './version';
 
 export default function App() {
   // Navigation & Screens
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover' | 'team_hub' | 'be_the_fly'>('menu');
   const [gameMode, setGameMode] = useState<GameMode>('arcade');
   const gameCanvasRef = useRef<GameCanvasHandle>(null);
+  
+  const [currentTime, setCurrentTime] = useState(new Date());
+  useEffect(() => {
+    let intervalId: number;
+    if (gameState === 'menu') {
+      setCurrentTime(new Date());
+      intervalId = window.setInterval(() => {
+        setCurrentTime(new Date());
+      }, 1000);
+    }
+    return () => {
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [gameState]);
+
   const [isBeTheFlyOverlayActive, setIsBeTheFlyOverlayActive] = useState(false);
 
   // Playtest Telemetry System (for Sid & Scott)
@@ -466,17 +482,25 @@ export default function App() {
               <h1 className={`${viewportMode === 'telegram_pc' ? 'text-xl' : 'text-4xl md:text-5xl'} font-serif font-black text-brand-charcoal tracking-tight leading-none`}>
                 Chopstick Fly Catcher
               </h1>
-              {/* Active Build & Test Indicator Badge */}
-              <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 bg-amber-100/90 border-2 border-amber-700 rounded-full text-amber-950 font-mono text-[10px] sm:text-xs font-bold tracking-tight shadow-sm">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
-                </span>
-                <span>ACTIVE BUILD: 🧲 Magnetic Chopsticks & Swarm Overhaul (V2.4)</span>
+              {/* Active Build & Last Updated Timestamp Indicator */}
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 mt-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100/90 border-2 border-amber-700 rounded-full text-amber-950 font-mono text-[10px] sm:text-xs font-bold tracking-tight shadow-sm">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                  </span>
+                  <span>BUILD {APP_VERSION}: {BUILD_INFO.features}</span>
+                </div>
+                <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 border-2 border-emerald-700 rounded-full text-emerald-950 font-mono text-[10px] sm:text-xs font-bold tracking-tight shadow-sm">
+                  <span>🕒 UPDATED: {LAST_UPDATE_TIMESTAMP}</span>
+                </div>
               </div>
               <p className={`${viewportMode === 'telegram_pc' ? 'text-[10px]' : 'text-[11px] md:text-sm'} text-brand-charcoal/80 mt-1.5 max-w-md mx-auto italic font-serif`}>
                 "Concentration is the path to speed. Control your chopsticks, control your destiny."
               </p>
+              <div className="mt-1.5 text-[10px] sm:text-xs font-mono font-bold text-brand-charcoal/70 bg-brand-ivory/60 px-3 py-0.5 border border-brand-charcoal/20 inline-block shadow-sm">
+                Device Clock: {currentTime.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </div>
               <div className={`w-16 h-0.5 bg-brand-charcoal mx-auto ${viewportMode === 'telegram_pc' ? 'mt-1.5' : 'mt-2.5'}`}></div>
             </div>
 
