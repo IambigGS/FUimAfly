@@ -171,6 +171,7 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
 
   // Evasive Dash Action
   const triggerDash = () => {
+    isFeastingRef.current = false;
     const fly = flyState.current;
     if (fly.stamina < 25 || fly.dashTimer > 0) return;
 
@@ -186,6 +187,7 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
 
   // Vertical Ascend Action
   const triggerAscend = () => {
+    isFeastingRef.current = false;
     const fly = flyState.current;
     if (fly.stamina < 15) return;
 
@@ -209,6 +211,11 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
     if (gameState === 'onboarding') {
       setGameState('playing');
       return;
+    }
+
+    // Touch Resume: Instantly stop feasting when player touches screen to steer
+    if (!keysPressed.current['Space'] && !keysPressed.current['KeyE']) {
+      isFeastingRef.current = false;
     }
 
     const canvas = canvasRef.current;
@@ -252,6 +259,26 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
         joystickTouchId.current = null;
         joystickStart.current = null;
         joystickCurrent.current = null;
+
+        // Touch Release Auto-Feast:
+        // If fly is landed or landing over an uneaten dumpling, lift-to-feast!
+        const fly = flyState.current;
+        let closestIdx = -1;
+        let minDist = 0.20;
+
+        dumplingsRef.current.forEach((d, idx) => {
+          if (d.eaten < 100) {
+            const dist = Math.hypot(fly.x - d.x, fly.y - d.y);
+            if (dist < minDist) {
+              minDist = dist;
+              closestIdx = idx;
+            }
+          }
+        });
+
+        if (closestIdx !== -1) {
+          isFeastingRef.current = true;
+        }
       }
     }
   };
@@ -359,6 +386,13 @@ export const BeTheFlyCanvas: React.FC<BeTheFlyCanvasProps> = ({
             closestDumplingIndex = idx;
           }
         });
+
+        // Auto-disengage feasting if fly drifts off dumpling or dumpling reaches 100%
+        if (closestDumplingIndex === -1 || dumplingsRef.current[closestDumplingIndex]?.eaten >= 100) {
+          if (!keysPressed.current['Space'] && !keysPressed.current['KeyE']) {
+            isFeastingRef.current = false;
+          }
+        }
 
         const isCurrentlyMunching = isFeastingRef.current && fly.isLanded && closestDumplingIndex !== -1;
 
