@@ -257,7 +257,20 @@ export default function App() {
     };
   }, [gameState, soundEnabled]);
 
-  // Handle background music on the main menu screen ('Black Stinky')
+  // Global Audio Unlock Listener on user's first click or tap
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      audio.resume();
+    };
+    window.addEventListener('pointerdown', handleFirstInteraction, { passive: true });
+    window.addEventListener('keydown', handleFirstInteraction, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
+
+  // Handle background music on the main menu screen ('Fly By Me')
   useEffect(() => {
     if (gameState === 'menu' && soundEnabled) {
       audio.playMenuMusic();

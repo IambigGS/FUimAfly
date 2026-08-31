@@ -36,11 +36,10 @@ class AudioEngine {
   private activeFluteOscs: { osc: OscillatorNode; gain: GainNode }[] = [];
   private activeFlybyAudio: HTMLAudioElement | null = null;
 
-  // Main Menu Background Music ('Black Stinky')
+  // Main Menu Background Music ('Fly By Me')
   private menuMusicAudio: HTMLAudioElement | null = null;
-  private menuMusicSourceNode: MediaElementAudioSourceNode | null = null;
-  private menuMusicGain: GainNode | null = null;
   private isMenuMusicPlaying = false;
+  private menuMusicFadeInterval: number | null = null;
 
   // Master volume variables (0 to 1)
   private masterVolume = 0.5;
@@ -99,7 +98,9 @@ class AudioEngine {
           this.ctx.resume().catch(console.warn);
         }
         if (this.isMenuMusicPlaying && this.menuMusicAudio && !this.isCutsceneMuted && this.soundEnabled) {
-          this.menuMusicAudio.play().catch(console.warn);
+          this.menuMusicAudio.play().then(() => {
+            this.fadeMenuMusicTo(this.getMenuMusicTargetVolume(), 200);
+          }).catch(console.warn);
         }
       }
     };
@@ -139,7 +140,9 @@ class AudioEngine {
     if (isGameplayActive && this.soundEnabled) {
       this.startZenFluteMelody();
     } else if (!isGameplayActive && this.isMenuMusicPlaying && this.soundEnabled && this.menuMusicAudio) {
-      this.menuMusicAudio.play().catch(console.warn);
+      this.menuMusicAudio.play().then(() => {
+        this.fadeMenuMusicTo(this.getMenuMusicTargetVolume(), 300);
+      }).catch(console.warn);
     }
   }
 
@@ -201,10 +204,12 @@ class AudioEngine {
   resume() {
     this.init();
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch(console.warn);
     }
-    if (this.isMenuMusicPlaying && this.menuMusicAudio && this.menuMusicAudio.paused && this.soundEnabled) {
-      this.menuMusicAudio.play().catch(console.warn);
+    if (this.isMenuMusicPlaying && this.menuMusicAudio && this.menuMusicAudio.paused && this.soundEnabled && !this.isCutsceneMuted) {
+      this.menuMusicAudio.play().then(() => {
+        this.fadeMenuMusicTo(this.getMenuMusicTargetVolume(), 300);
+      }).catch(console.warn);
     }
   }
 
@@ -213,13 +218,25 @@ class AudioEngine {
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setValueAtTime(enabled ? this.masterVolume : 0, this.ctx.currentTime);
     }
-    if (this.menuMusicAudio && !this.menuMusicSourceNode) {
-      this.menuMusicAudio.volume = (enabled ? this.masterVolume : 0) * this.musicVolume;
-    }
-    if (enabled && this.isMenuMusicPlaying && this.menuMusicAudio && this.menuMusicAudio.paused) {
-      this.menuMusicAudio.play().catch(console.warn);
-    } else if (!enabled && this.menuMusicAudio && !this.menuMusicAudio.paused) {
-      this.menuMusicAudio.pause();
+    if (enabled) {
+      if (this.isMenuMusicPlaying && this.menuMusicAudio) {
+        if (this.menuMusicAudio.paused) {
+          this.menuMusicAudio.volume = 0;
+          this.menuMusicAudio.play().then(() => {
+            this.fadeMenuMusicTo(this.getMenuMusicTargetVolume(), 300);
+          }).catch(console.warn);
+        } else {
+          this.fadeMenuMusicTo(this.getMenuMusicTargetVolume(), 200);
+        }
+      }
+    } else {
+      if (this.menuMusicAudio && !this.menuMusicAudio.paused) {
+        this.fadeMenuMusicTo(0, 200, () => {
+          if (!this.soundEnabled && this.menuMusicAudio) {
+            this.menuMusicAudio.pause();
+          }
+        });
+      }
     }
   }
 
@@ -234,8 +251,8 @@ class AudioEngine {
       if (this.musicGain) this.musicGain.gain.setValueAtTime(music, now);
       if (this.sfxGain) this.sfxGain.gain.setValueAtTime(sfx, now);
     }
-    if (this.menuMusicAudio && !this.menuMusicSourceNode) {
-      this.menuMusicAudio.volume = (this.soundEnabled ? master : 0) * music;
+    if (this.menuMusicAudio && this.isMenuMusicPlaying && !this.menuMusicFadeInterval) {
+      this.menuMusicAudio.volume = this.getMenuMusicTargetVolume();
     }
   }
 
@@ -1156,63 +1173,85 @@ class AudioEngine {
     }, 600);
   }
 
-  // Main Menu Background Music ('Black Stinky')
+  public getMenuMusicTargetVolume(): number {
+    if (!this.soundEnabled || this.isCutsceneMuted) return 0;
+    return Math.max(0, Math.min(1, this.masterVolume * this.musicVolume));
+  }
+
+  private fadeMenuMusicTo(targetVol: number, durationMs: number = 350, onComplete?: () => void) {
+    if (this.menuMusicFadeInterval) {
+      clearInterval(this.menuMusicFadeInterval);
+      this.menuMusicFadeInterval = null;
+    }
+    if (!this.menuMusicAudio) {
+      if (onComplete) onComplete();
+      return;
+    }
+
+    const startVol = this.menuMusicAudio.volume;
+    const startTime = performance.now();
+
+    this.menuMusicFadeInterval = window.setInterval(() => {
+      if (!this.menuMusicAudio) {
+        if (this.menuMusicFadeInterval) clearInterval(this.menuMusicFadeInterval);
+        this.menuMusicFadeInterval = null;
+        if (onComplete) onComplete();
+        return;
+      }
+
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(1, elapsed / durationMs);
+      const currentVol = startVol + (targetVol - startVol) * progress;
+      this.menuMusicAudio.volume = Math.max(0, Math.min(1, currentVol));
+
+      if (progress >= 1) {
+        if (this.menuMusicFadeInterval) clearInterval(this.menuMusicFadeInterval);
+        this.menuMusicFadeInterval = null;
+        if (onComplete) onComplete();
+      }
+    }, 20);
+  }
+
+  // Main Menu Background Music ('Fly By Me')
   playMenuMusic() {
     this.isMenuMusicPlaying = true;
     if (this.isCutsceneMuted || !this.soundEnabled) return;
 
-    this.init();
     if (!this.menuMusicAudio) {
-      const soundUrl = getAssetUrl('sounds/black_stinky.mp3');
+      const soundUrl = getAssetUrl('sounds/fly_by_me.mp3');
       this.menuMusicAudio = new Audio(soundUrl);
       this.menuMusicAudio.loop = true;
       this.menuMusicAudio.preload = 'auto';
-
-      if (this.ctx && !this.menuMusicSourceNode) {
-        try {
-          this.menuMusicSourceNode = this.ctx.createMediaElementSource(this.menuMusicAudio);
-          this.menuMusicGain = this.ctx.createGain();
-          this.menuMusicGain.gain.setValueAtTime(0.001, this.ctx.currentTime);
-          this.menuMusicSourceNode.connect(this.menuMusicGain);
-          this.menuMusicGain.connect(this.musicGain || this.masterGain!);
-        } catch (e) {
-          console.warn('Could not connect menu music to Web Audio context, using HTMLAudio fallback:', e);
-          this.menuMusicSourceNode = null;
-        }
-      }
     }
 
-    if (this.menuMusicGain && this.ctx) {
-      const now = this.ctx.currentTime;
-      this.menuMusicGain.gain.cancelScheduledValues(now);
-      this.menuMusicGain.gain.setValueAtTime(Math.max(0.001, this.menuMusicGain.gain.value), now);
-      this.menuMusicGain.gain.linearRampToValueAtTime(1.0, now + 0.4);
-    } else if (this.menuMusicAudio) {
-      this.menuMusicAudio.volume = (this.soundEnabled ? this.masterVolume : 0) * this.musicVolume;
-    }
+    const targetVol = this.getMenuMusicTargetVolume();
+    this.menuMusicAudio.volume = 0;
 
-    if (this.menuMusicAudio) {
-      const playPromise = this.menuMusicAudio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          // Browser Autoplay Policy - wait for first user gesture
-          console.log('Menu BGM waiting for user interaction:', err.name);
-          const unlockAudio = () => {
+    const playPromise = this.menuMusicAudio.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          this.fadeMenuMusicTo(targetVol, 400);
+        })
+        .catch((err) => {
+          console.log('Autoplay blocked; waiting for user gesture to play menu music:', err.name);
+          const unlock = () => {
             if (this.isMenuMusicPlaying && this.soundEnabled && this.menuMusicAudio) {
               this.resume();
-              this.menuMusicAudio.play().catch(console.warn);
+              this.menuMusicAudio.play().then(() => {
+                this.fadeMenuMusicTo(this.getMenuMusicTargetVolume(), 400);
+              }).catch(console.warn);
             }
-            window.removeEventListener('pointerdown', unlockAudio);
-            window.removeEventListener('click', unlockAudio);
-            window.removeEventListener('keydown', unlockAudio);
-            window.removeEventListener('touchstart', unlockAudio);
+            window.removeEventListener('pointerdown', unlock);
+            window.removeEventListener('click', unlock);
+            window.removeEventListener('keydown', unlock);
+            window.removeEventListener('touchstart', unlock);
           };
-          window.addEventListener('pointerdown', unlockAudio, { once: true });
-          window.addEventListener('click', unlockAudio, { once: true });
-          window.addEventListener('keydown', unlockAudio, { once: true });
-          window.addEventListener('touchstart', unlockAudio, { once: true });
+          window.addEventListener('pointerdown', unlock, { once: true });
+          window.addEventListener('click', unlock, { once: true });
+          window.addEventListener('keydown', unlock, { once: true });
+          window.addEventListener('touchstart', unlock, { once: true });
         });
-      }
     }
   }
 
@@ -1220,20 +1259,21 @@ class AudioEngine {
     this.isMenuMusicPlaying = false;
     if (!this.menuMusicAudio) return;
 
-    if (!immediate && this.menuMusicGain && this.ctx) {
-      const now = this.ctx.currentTime;
-      this.menuMusicGain.gain.cancelScheduledValues(now);
-      this.menuMusicGain.gain.setValueAtTime(this.menuMusicGain.gain.value, now);
-      this.menuMusicGain.gain.linearRampToValueAtTime(0.001, now + 0.3);
-      setTimeout(() => {
+    if (immediate) {
+      if (this.menuMusicFadeInterval) {
+        clearInterval(this.menuMusicFadeInterval);
+        this.menuMusicFadeInterval = null;
+      }
+      this.menuMusicAudio.pause();
+      this.menuMusicAudio.currentTime = 0;
+      this.menuMusicAudio.volume = 0;
+    } else {
+      this.fadeMenuMusicTo(0, 300, () => {
         if (!this.isMenuMusicPlaying && this.menuMusicAudio) {
           this.menuMusicAudio.pause();
           this.menuMusicAudio.currentTime = 0;
         }
-      }, 350);
-    } else {
-      this.menuMusicAudio.pause();
-      this.menuMusicAudio.currentTime = 0;
+      });
     }
   }
 
