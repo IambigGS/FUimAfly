@@ -257,6 +257,18 @@ export default function App() {
     };
   }, [gameState, soundEnabled]);
 
+  // Handle background music on the main menu screen ('Black Stinky')
+  useEffect(() => {
+    if (gameState === 'menu' && soundEnabled) {
+      audio.playMenuMusic();
+    } else {
+      audio.stopMenuMusic();
+    }
+    return () => {
+      audio.stopMenuMusic();
+    };
+  }, [gameState, soundEnabled]);
+
   // Start the Game
   const handleStartGame = (mode: GameMode) => {
     audio.resume();

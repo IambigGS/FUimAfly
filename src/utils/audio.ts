@@ -36,6 +36,12 @@ class AudioEngine {
   private activeFluteOscs: { osc: OscillatorNode; gain: GainNode }[] = [];
   private activeFlybyAudio: HTMLAudioElement | null = null;
 
+  // Main Menu Background Music ('Black Stinky')
+  private menuMusicAudio: HTMLAudioElement | null = null;
+  private menuMusicSourceNode: MediaElementAudioSourceNode | null = null;
+  private menuMusicGain: GainNode | null = null;
+  private isMenuMusicPlaying = false;
+
   // Master volume variables (0 to 1)
   private masterVolume = 0.5;
   private musicVolume = 0.3;
@@ -85,9 +91,15 @@ class AudioEngine {
         if (this.activeFlybyAudio) {
           this.activeFlybyAudio.pause();
         }
+        if (this.menuMusicAudio) {
+          this.menuMusicAudio.pause();
+        }
       } else {
         if (this.ctx.state === 'suspended' && !this.isCutsceneMuted) {
           this.ctx.resume().catch(console.warn);
+        }
+        if (this.isMenuMusicPlaying && this.menuMusicAudio && !this.isCutsceneMuted && this.soundEnabled) {
+          this.menuMusicAudio.play().catch(console.warn);
         }
       }
     };
@@ -101,6 +113,9 @@ class AudioEngine {
     this.clearAllBuzzers();
     this.stopZenFluteMelody();
     this.stopFlybyNarration();
+    if (this.menuMusicAudio) {
+      this.menuMusicAudio.pause();
+    }
 
     if (this.ctx && this.masterGain) {
       const now = this.ctx.currentTime;
@@ -123,6 +138,8 @@ class AudioEngine {
 
     if (isGameplayActive && this.soundEnabled) {
       this.startZenFluteMelody();
+    } else if (!isGameplayActive && this.isMenuMusicPlaying && this.soundEnabled && this.menuMusicAudio) {
+      this.menuMusicAudio.play().catch(console.warn);
     }
   }
 
@@ -186,12 +203,23 @@ class AudioEngine {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
+    if (this.isMenuMusicPlaying && this.menuMusicAudio && this.menuMusicAudio.paused && this.soundEnabled) {
+      this.menuMusicAudio.play().catch(console.warn);
+    }
   }
 
   setSoundEnabled(enabled: boolean) {
     this.soundEnabled = enabled;
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setValueAtTime(enabled ? this.masterVolume : 0, this.ctx.currentTime);
+    }
+    if (this.menuMusicAudio && !this.menuMusicSourceNode) {
+      this.menuMusicAudio.volume = (enabled ? this.masterVolume : 0) * this.musicVolume;
+    }
+    if (enabled && this.isMenuMusicPlaying && this.menuMusicAudio && this.menuMusicAudio.paused) {
+      this.menuMusicAudio.play().catch(console.warn);
+    } else if (!enabled && this.menuMusicAudio && !this.menuMusicAudio.paused) {
+      this.menuMusicAudio.pause();
     }
   }
 
@@ -205,6 +233,9 @@ class AudioEngine {
       if (this.masterGain) this.masterGain.gain.setValueAtTime(this.soundEnabled ? master : 0, now);
       if (this.musicGain) this.musicGain.gain.setValueAtTime(music, now);
       if (this.sfxGain) this.sfxGain.gain.setValueAtTime(sfx, now);
+    }
+    if (this.menuMusicAudio && !this.menuMusicSourceNode) {
+      this.menuMusicAudio.volume = (this.soundEnabled ? master : 0) * music;
     }
   }
 
@@ -1123,6 +1154,87 @@ class AudioEngine {
       });
       this.activeFluteOscs = [];
     }, 600);
+  }
+
+  // Main Menu Background Music ('Black Stinky')
+  playMenuMusic() {
+    this.isMenuMusicPlaying = true;
+    if (this.isCutsceneMuted || !this.soundEnabled) return;
+
+    this.init();
+    if (!this.menuMusicAudio) {
+      const soundUrl = getAssetUrl('sounds/black_stinky.mp3');
+      this.menuMusicAudio = new Audio(soundUrl);
+      this.menuMusicAudio.loop = true;
+      this.menuMusicAudio.preload = 'auto';
+
+      if (this.ctx && !this.menuMusicSourceNode) {
+        try {
+          this.menuMusicSourceNode = this.ctx.createMediaElementSource(this.menuMusicAudio);
+          this.menuMusicGain = this.ctx.createGain();
+          this.menuMusicGain.gain.setValueAtTime(0.001, this.ctx.currentTime);
+          this.menuMusicSourceNode.connect(this.menuMusicGain);
+          this.menuMusicGain.connect(this.musicGain || this.masterGain!);
+        } catch (e) {
+          console.warn('Could not connect menu music to Web Audio context, using HTMLAudio fallback:', e);
+          this.menuMusicSourceNode = null;
+        }
+      }
+    }
+
+    if (this.menuMusicGain && this.ctx) {
+      const now = this.ctx.currentTime;
+      this.menuMusicGain.gain.cancelScheduledValues(now);
+      this.menuMusicGain.gain.setValueAtTime(Math.max(0.001, this.menuMusicGain.gain.value), now);
+      this.menuMusicGain.gain.linearRampToValueAtTime(1.0, now + 0.4);
+    } else if (this.menuMusicAudio) {
+      this.menuMusicAudio.volume = (this.soundEnabled ? this.masterVolume : 0) * this.musicVolume;
+    }
+
+    if (this.menuMusicAudio) {
+      const playPromise = this.menuMusicAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          // Browser Autoplay Policy - wait for first user gesture
+          console.log('Menu BGM waiting for user interaction:', err.name);
+          const unlockAudio = () => {
+            if (this.isMenuMusicPlaying && this.soundEnabled && this.menuMusicAudio) {
+              this.resume();
+              this.menuMusicAudio.play().catch(console.warn);
+            }
+            window.removeEventListener('pointerdown', unlockAudio);
+            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('keydown', unlockAudio);
+            window.removeEventListener('touchstart', unlockAudio);
+          };
+          window.addEventListener('pointerdown', unlockAudio, { once: true });
+          window.addEventListener('click', unlockAudio, { once: true });
+          window.addEventListener('keydown', unlockAudio, { once: true });
+          window.addEventListener('touchstart', unlockAudio, { once: true });
+        });
+      }
+    }
+  }
+
+  stopMenuMusic(immediate = false) {
+    this.isMenuMusicPlaying = false;
+    if (!this.menuMusicAudio) return;
+
+    if (!immediate && this.menuMusicGain && this.ctx) {
+      const now = this.ctx.currentTime;
+      this.menuMusicGain.gain.cancelScheduledValues(now);
+      this.menuMusicGain.gain.setValueAtTime(this.menuMusicGain.gain.value, now);
+      this.menuMusicGain.gain.linearRampToValueAtTime(0.001, now + 0.3);
+      setTimeout(() => {
+        if (!this.isMenuMusicPlaying && this.menuMusicAudio) {
+          this.menuMusicAudio.pause();
+          this.menuMusicAudio.currentTime = 0;
+        }
+      }, 350);
+    } else {
+      this.menuMusicAudio.pause();
+      this.menuMusicAudio.currentTime = 0;
+    }
   }
 
   getNinjaClipCount(): number {
